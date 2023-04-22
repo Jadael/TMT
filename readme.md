@@ -97,7 +97,7 @@ Ouroboros steps through polyphonic channels to turn it into a sequence.
 
 ![Append](screenshots/append.png)
 
-The Append module is a versatile Eurorack-style utility that takes in multiple input signals and combines them into a single polyphonic output with a selectable range of channels. The module allows you to control the output width and rotation to create a customizable polyphonic subset of voltages from the input signals.
+Takes multiple mono or poly input signals and combines them into a single polyphonic output with a selectable range of channels. Control the output width and rotation to create a customizable polyphonic subset of voltages from the input signals.
 
 1. Connect up to 16 signals to the input jacks (Signal 1 to Signal 16). The module collects all channels from all connected signals into an internal buffer, in input order.
 2. Use the Width input to control the number of channels in the output. The range goes from 1 channel up to the total number of connected input channels (or 16, whichever is lower). A 0V signal corresponds to a 1-channel output, and a 10V signal corresponds to the maximum number of channels.
