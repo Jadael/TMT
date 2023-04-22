@@ -28,11 +28,10 @@ Shuffles the channels of an incoming polyphonic signal and outputs the re-ordere
 
 # Calendar
 
-Calendar is a VCV Rack module that provides a set of very slow LFOs representing the progress through various major time/calendar units. The module outputs voltages ranging from 0 to 10V, where each voltage corresponds to the current "progress" through the respective time unit.
+Calendar generates a set of very slow LFO-like signals representing the progress through various various time/calendar units. The module outputs voltages ranging from 0 to 10V, where each voltage corresponds to the current "progress" through the respective time unit.
 
-- Ramps and gates for seconds, minutes, hours, days, months, quarters, and years
+- Ramps, triggers, and gates for seconds, minutes, hours, days, months, quarters, and years
 - Voltages range from 0 to 10V
-- Can be used for slowly evolving modulation, generative patching, or time-based sequencing
 - Alt Mode: Use UTC time instead of Local time.
 
 ## Outputs
