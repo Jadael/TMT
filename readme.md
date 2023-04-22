@@ -2,7 +2,7 @@
 
 # Shuffle
 
-![Shuffle](screenshots/shuffle.png){:style="float: right;margin: 2em;"}
+![Shuffle](screenshots/shuffle.png)
 
 Shuffles the channels of an incoming polyphonic signal and outputs the re-ordered signal. The module allows you to control the number of output channels and provides a trigger input to initiate the shuffle. The shuffle is deterministic, meaning that the same seed will always give the same shuffle. If no seed is provided, the module will generate and use a new (unpredictable) seed on every trigger input.
 
@@ -25,7 +25,7 @@ Shuffles the channels of an incoming polyphonic signal and outputs the re-ordere
 
 # Calendar
 
-![Calendar](screenshots/calendar.png){:style="float: right;margin: 2em;"}
+![Calendar](screenshots/calendar.png)
 
 Calendar generates a set of very slow LFO-like signals representing the progress through various various time/calendar units. The module outputs voltages ranging from 0 to 10V, where each voltage corresponds to the current "progress" through the respective time unit.
 
@@ -74,7 +74,7 @@ Seed is a random voltage generator with 16 outputs and a polyphonic output, prov
 
 # Ouroboros
 
-![Ouroboros](screenshots/ouroboros.png){:style="float: right;margin: 2em;"}
+![Ouroboros](screenshots/ouroboros.png)
 
 Ouroboros steps through polyphonic channels to turn it into a sequence.
 
@@ -95,7 +95,7 @@ Ouroboros steps through polyphonic channels to turn it into a sequence.
 
 # Append
 
-![Append](screenshots/append.png){:style="float: right;margin: 2em;"}
+![Append](screenshots/append.png)
 
 Takes multiple mono or poly input signals and combines them into a single polyphonic output with a selectable range of channels. Control the output width and rotation to create a customizable polyphonic subset of voltages from the input signals.
 
