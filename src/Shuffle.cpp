@@ -34,31 +34,28 @@ struct Shuffle : Module {
 	dsp::SchmittTrigger trigger;
 	std::random_device rd;
 	std::mt19937 rng{rd()};
-	std::vector<int> reorder = {0,1,2,3,4,5,6,7,8,9,10,11};
-	int inputChannels = 12;
-	int outputChannels = inputChannels;
-	int FinalSize = 12;
-	std::vector<float> defaultVoltages = {0.0000, 0.0833, 0.1667, 0.2500, 0.3333, 0.4167, 0.5000, 0.5833, 0.6667, 0.7500, 0.8333, 0.9167};
-	std::vector<float> inputVoltages = defaultVoltages;
+	std::array<int, 16> reorder = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+	size_t inputChannels = 12;
+	size_t outputChannels = inputChannels;
+	size_t FinalSize = 12;
+	std::array<float, 16> defaultVoltages = {0.0000, 0.0833, 0.1667, 0.2500, 0.3333, 0.4167, 0.5000, 0.5833, 0.6667, 0.7500, 0.8333, 0.9167, 0.0, 0.0, 0.0, 0.0};
+	std::array<float, 16> inputVoltages = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+	size_t maxSize = 16;
 	int seed;
 	float germ;
 	bool lastToggle;
 
 	void process(const ProcessArgs& args) override {
-		// Check if there was a new Trigger this cycle, continue current output if not.
-		//float trigger = inputs[TRIGGER_INPUT].getVoltage(); // Old trigger method
-		//if (trigger > 0.f && lastTrigger <= 0.f) { // Old trigger method
+		// Check for alt-mode toggle
 		bool currentToggle = params[TOGGLE_SWITCH].getValue() > 0.5f;
 		// Restrict the number of output channels based on the OUTPUT_CHANNELS_INPUT: 1 channel at 0.00 volts, half the input channels at 5.00 volts, all input channels at 10.00 volts, etc. (Clamp this input to 0.00v-10.00v)
 		if (inputs[POLYPHONIC_PITCH_INPUT].isConnected()) {
 			inputChannels = inputs[POLYPHONIC_PITCH_INPUT].getChannels();
-			inputVoltages.resize(inputChannels);
-			for (int i = 0; i < inputChannels; i++) {
+			for (size_t i = 0; i < std::min(inputChannels, maxSize); i++) {
 				inputVoltages[i] = inputs[POLYPHONIC_PITCH_INPUT].getVoltage(i);
 			}
 		} else {
-			inputChannels = 12;
-			inputVoltages.resize(inputChannels);
+			inputChannels = defaultVoltages.size();
 			inputVoltages = defaultVoltages;
 		}
 		
@@ -80,27 +77,33 @@ struct Shuffle : Module {
 				rng.seed(rd());
 			}
 			// Create a new shuffling using that seed, sized to current input
-			reorder.resize(inputChannels);
-			for (int i = 0; i < inputChannels; i++) {
+			// Reset the shuffle
+			for (size_t i = 0; i < reorder.size(); i++) {
 				reorder[i] = i;
 			}
-			// Randomize the reordering
+			// Randomize the shuffle
 			if (params[TOGGLE_SWITCH].getValue() < 0.5f) {
 				// Random "shuffle", with no duplicates
-				std::shuffle(reorder.begin(), reorder.end(), rng);
+				if (inputChannels > 1) {
+					// Shuffle within size of input channels
+					std::shuffle(reorder.begin(), reorder.begin() + inputChannels, rng);
+				}
+				else {
+					// If there's only one input channel, just pass it through
+					reorder[0] = 0;
+				}
 			} else {
 				// Random "selection", with potential duplicates
 				for (size_t i = 0; i < reorder.size(); ++i) {
-					int randomIndex = std::uniform_int_distribution<size_t>(0, reorder.size() - 1)(rng);
+					int randomIndex = std::uniform_int_distribution<size_t>(0, inputChannels - 1)(rng);
 					reorder[i] = randomIndex;
 				}
 			}
 		}
 		// And/Or, if the number of input channels changed, randomize again, re-using the current seed
-		if (currentToggle != lastToggle or inputChannels != int(reorder.size())) {
+		if (currentToggle != lastToggle or inputChannels != reorder.size()) {
 			// Detect and list inputs
-			reorder.resize(inputChannels);
-			for (int i = 0; i < inputChannels; i++) {
+			for (size_t i = 0; i < inputChannels; i++) {
 				reorder[i] = i;
 			}
 			// Reset the random seed
@@ -108,11 +111,11 @@ struct Shuffle : Module {
 			// Randomize the reordering
 			if (params[TOGGLE_SWITCH].getValue() < 0.5f) {
 				// Random "shuffle", with no duplicates
-				std::shuffle(reorder.begin(), reorder.end(), rng);
+				std::shuffle(reorder.begin(), reorder.begin() + inputChannels, rng);
 			} else {
 				// Random "selection", with potential duplicates
-				for (size_t i = 0; i < reorder.size(); ++i) {
-					int randomIndex = std::uniform_int_distribution<size_t>(0, reorder.size() - 1)(rng);
+				for (size_t i = 0; i < inputChannels; ++i) {
+					int randomIndex = std::uniform_int_distribution<size_t>(0, inputChannels - 1)(rng);
 					reorder[i] = randomIndex;
 				}
 			}
@@ -120,13 +123,9 @@ struct Shuffle : Module {
 		}
 		// Pass through the current incoming polyphonic signal, sorted according to the most recent "shuffling"
 		// Constrained to "FinalSize" which is the lesser of the current Output Channels and current Reorder size
-		if (int(reorder.size()) >= outputChannels) {
-			FinalSize = outputChannels;
-		} else {
-			FinalSize = reorder.size();
-		}
+		FinalSize = std::min(inputChannels, outputChannels);
 		
-		for (int i = 0; i < FinalSize; i++) {
+		for (size_t i = 0; i < FinalSize; i++) {
 			outputs[REORDERED_PITCH_OUTPUT].setVoltage(inputVoltages[reorder[i]], i);
 		}
 		outputs[REORDERED_PITCH_OUTPUT].setChannels(FinalSize);
@@ -150,7 +149,7 @@ struct ShuffleDiagram : LightWidget {
 		float yOffset = 30;
 		float ySpacing = 120.0 / module->inputChannels-1;
 		//int CappedInput std::min(module->inputChannels,module->FinalSize);
-		for (int i = 0; i < module->inputChannels; i++) {
+		for (size_t i = 0; i < module->inputChannels; i++) {
 			nvgFillColor(args.vg, nvgRGBA(254, 201, 1, 255));
 			nvgBeginPath(args.vg);
 			nvgCircle(args.vg, xInput, yOffset + i * ySpacing, 1.5);
@@ -163,7 +162,7 @@ struct ShuffleDiagram : LightWidget {
 			}
 		}
 		// Draw the lines connecting input and output channels (up to current FinalSize, to avoid drawing undefined outputs)
-		for (int i = 0; i < module->FinalSize; i++) {
+		for (size_t i = 0; i < module->FinalSize; i++) {
 			nvgBeginPath(args.vg);
 			nvgMoveTo(args.vg, xInput, yOffset + module->reorder[i] * ySpacing);
 			nvgLineTo(args.vg, xOutput, yOffset + i * ySpacing);
