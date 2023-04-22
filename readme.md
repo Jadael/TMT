@@ -6,11 +6,7 @@ This project is licensed under the MIT License. See the [license.txt](license.tx
 
 ---
 
-# Modules
-
----
-
-## Shuffle
+# Shuffle
 Shuffles the channels of an incoming polyphonic signal and outputs the re-ordered signal. The module allows you to control the number of output channels and provides a trigger input to initiate the shuffle. The shuffle is deterministic, meaning that the same seed will always give the same shuffle. If no seed is provided, the module will generate and use a new (unpredictable) seed on every trigger input.
 
 - Polyphonic input and output
@@ -20,7 +16,7 @@ Shuffles the channels of an incoming polyphonic signal and outputs the re-ordere
 - Outputs track the inputs as they change, while retaining the current shuffle
 - Alt Mode: Allow input channels to potentially be selected multiple times in the output
 
-### Inputs & Outputs
+## Inputs & Outputs
 
 - Shuffle Trigger - Triggers a shuffle of the polyphonic voltages, according to the current Seed.
 - Poly In (optional) - Polyphonic signal to be shuffled. If no cable is connected, a one-octave chromatic scale will be used as the default input.
@@ -30,7 +26,7 @@ Shuffles the channels of an incoming polyphonic signal and outputs the re-ordere
 
 ---
 
-## Calendar
+# Calendar
 
 Calendar is a VCV Rack module that provides a set of very slow LFOs representing the progress through various major time/calendar units. The module outputs voltages ranging from 0 to 10V, where each voltage corresponds to the current "progress" through the respective time unit.
 
@@ -39,7 +35,7 @@ Calendar is a VCV Rack module that provides a set of very slow LFOs representing
 - Can be used for slowly evolving modulation, generative patching, or time-based sequencing
 - Alt Mode: Use UTC time instead of Local time.
 
-#### Outputs
+## Outputs
 Each time unit has a row of five outputs:
 
 - Linear Ramp - This output is a smooth, continuous voltage ranging from 0 to 10V. It is calculated by taking the current progress (a value between 0 and 1) of the time unit and scaling it by a factor of 10. As the progress of the time unit increases, the output voltage increases linearly.
@@ -58,7 +54,7 @@ Each time unit has a row of five outputs:
 
 ---
 
-## Seed
+# Seed
 
 Seed is a random voltage generator with 16 outputs and a polyphonic output, providing random values based on a given input voltage as the seed. When the input seed changes, the module generates 16 random numbers normalized between 0.0V and 10.0V. These random values are output individually across the 16 numbered outputs and as a polyphonic signal through the polyphonic output.
 
@@ -68,7 +64,7 @@ Seed is a random voltage generator with 16 outputs and a polyphonic output, prov
 - Regenerates random values only when the seed changes
 - Alt Mode: Snap outputs to 0v or 10v - useful for generating a gate pattern.
 
-### Inputs and Outputs
+## Inputs and Outputs
 
 - **Seed**: Input voltage used as the seed for random number generation. If no input is connected, initializes to a random seed.
 - **Poly Out**: Polyphonic output with 16 channels containing random voltages.
@@ -76,7 +72,7 @@ Seed is a random voltage generator with 16 outputs and a polyphonic output, prov
 
 ---
 
-## Ouroboros
+# Ouroboros
 
 Ouroboros steps through polyphonic channels to turn it into a sequence.
 
@@ -85,7 +81,7 @@ Ouroboros steps through polyphonic channels to turn it into a sequence.
 - Reset and Clock inputs for precise control over sequence timing
 - Alt Mode: Output the average of current and next step
 
-### Inputs and Outputs
+## Inputs and Outputs
 
 - **TOGGLE_SWITCH:** A toggle switch to enable/disable the averaging of the current and next step values.
 - **POLY_SEQUENCE_INPUT:** A polyphonic input for connecting the source polyphonic signal to step through.
@@ -96,15 +92,13 @@ Ouroboros steps through polyphonic channels to turn it into a sequence.
 
 ---
 
-## Append
+# Append
 
 The Append module is a versatile Eurorack-style utility that takes in multiple input signals and combines them into a single polyphonic output with a selectable range of channels. The module allows you to control the output width and rotation to create a customizable polyphonic subset of voltages from the input signals.
 
 - 16 input signals with individual jacks
 - Width and Rotation controls to select the range of channels and starting point
 - 1 polyphonic output
-
-## Usage
 
 1. Connect up to 16 signals to the input jacks (Signal 1 to Signal 16). The module collects all channels from all connected signals into an internal buffer, in input order.
 2. Use the Width input to control the number of channels in the output. The range goes from 1 channel up to the total number of connected input channels (or 16, whichever is lower). A 0V signal corresponds to a 1-channel output, and a 10V signal corresponds to the maximum number of channels.
