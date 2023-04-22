@@ -1,0 +1,198 @@
+#include "plugin.hpp"
+#include "ports.hpp"
+
+struct Shuffle : Module {
+	enum ParamId {
+		TOGGLE_SWITCH,
+		PARAMS_LEN
+	};
+	enum InputId {
+		TRIGGER_INPUT,
+		POLYPHONIC_PITCH_INPUT,
+		SEED_INPUT,
+		OUTPUT_CHANNELS_INPUT,
+		INPUTS_LEN
+	};
+	enum OutputId {
+		REORDERED_PITCH_OUTPUT,
+		OUTPUTS_LEN
+	};
+	enum LightId {
+		LIGHTS_LEN
+	};
+
+	Shuffle() {
+		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Allow duplicate outputs");
+		configInput(TRIGGER_INPUT, "Shuffle Trigger");
+		configInput(POLYPHONIC_PITCH_INPUT, "Poly In");
+		configInput(SEED_INPUT, "Seed");
+		configInput(OUTPUT_CHANNELS_INPUT, "Number of Output Channels (0v-10v = 'one' to 'all')");
+		configOutput(REORDERED_PITCH_OUTPUT, "Poly Out");
+	}
+	
+	dsp::SchmittTrigger trigger;
+	std::random_device rd;
+	std::mt19937 rng{rd()};
+	std::vector<int> reorder = {0,1,2,3,4,5,6,7,8,9,10,11};
+	int inputChannels = 12;
+	int outputChannels = inputChannels;
+	int FinalSize = 12;
+	std::vector<float> defaultVoltages = {0.0000, 0.0833, 0.1667, 0.2500, 0.3333, 0.4167, 0.5000, 0.5833, 0.6667, 0.7500, 0.8333, 0.9167};
+	std::vector<float> inputVoltages = defaultVoltages;
+	int seed;
+	float germ;
+	bool lastToggle;
+
+	void process(const ProcessArgs& args) override {
+		// Check if there was a new Trigger this cycle, continue current output if not.
+		//float trigger = inputs[TRIGGER_INPUT].getVoltage(); // Old trigger method
+		//if (trigger > 0.f && lastTrigger <= 0.f) { // Old trigger method
+		bool currentToggle = params[TOGGLE_SWITCH].getValue() > 0.5f;
+		// Restrict the number of output channels based on the OUTPUT_CHANNELS_INPUT: 1 channel at 0.00 volts, half the input channels at 5.00 volts, all input channels at 10.00 volts, etc. (Clamp this input to 0.00v-10.00v)
+		if (inputs[POLYPHONIC_PITCH_INPUT].isConnected()) {
+			inputChannels = inputs[POLYPHONIC_PITCH_INPUT].getChannels();
+			inputVoltages.resize(inputChannels);
+			for (int i = 0; i < inputChannels; i++) {
+				inputVoltages[i] = inputs[POLYPHONIC_PITCH_INPUT].getVoltage(i);
+			}
+		} else {
+			inputChannels = 12;
+			inputVoltages.resize(inputChannels);
+			inputVoltages = defaultVoltages;
+		}
+		
+		if (inputs[OUTPUT_CHANNELS_INPUT].isConnected()) {
+			float outputChannelsVoltage = clamp(inputs[OUTPUT_CHANNELS_INPUT].getVoltage(), 0.f, 10.f);
+			outputChannels = std::round(rescale(outputChannelsVoltage, 0.f, 10.f, 1.f, inputChannels));
+		} else {
+			outputChannels = inputChannels;
+		}
+		
+		if (trigger.process(inputs[TRIGGER_INPUT].getVoltage())) {
+			// If there was a new trigger on TRIGGER_INPUT...
+			// Randomly re-order the list; use the voltage from SEED_INPUT for a deterministic result, or use a random seed otherwise
+			if (inputs[SEED_INPUT].isConnected()) {
+				germ  = (inputs[SEED_INPUT].getVoltage() + 10.f) / 20.f;
+				seed = static_cast<int>(germ * std::numeric_limits<int>::max());
+				rng.seed(seed);
+			} else {
+				rng.seed(rd());
+			}
+			// Create a new shuffling using that seed, sized to current input
+			reorder.resize(inputChannels);
+			for (int i = 0; i < inputChannels; i++) {
+				reorder[i] = i;
+			}
+			// Randomize the reordering
+			if (params[TOGGLE_SWITCH].getValue() < 0.5f) {
+				// Random "shuffle", with no duplicates
+				std::shuffle(reorder.begin(), reorder.end(), rng);
+			} else {
+				// Random "selection", with potential duplicates
+				for (size_t i = 0; i < reorder.size(); ++i) {
+					int randomIndex = std::uniform_int_distribution<size_t>(0, reorder.size() - 1)(rng);
+					reorder[i] = randomIndex;
+				}
+			}
+		}
+		// And/Or, if the number of input channels changed, randomize again, re-using the current seed
+		if (currentToggle != lastToggle or inputChannels != int(reorder.size())) {
+			// Detect and list inputs
+			reorder.resize(inputChannels);
+			for (int i = 0; i < inputChannels; i++) {
+				reorder[i] = i;
+			}
+			// Reset the random seed
+			rng.seed(seed); // Set the seed to be used
+			// Randomize the reordering
+			if (params[TOGGLE_SWITCH].getValue() < 0.5f) {
+				// Random "shuffle", with no duplicates
+				std::shuffle(reorder.begin(), reorder.end(), rng);
+			} else {
+				// Random "selection", with potential duplicates
+				for (size_t i = 0; i < reorder.size(); ++i) {
+					int randomIndex = std::uniform_int_distribution<size_t>(0, reorder.size() - 1)(rng);
+					reorder[i] = randomIndex;
+				}
+			}
+			lastToggle = currentToggle;
+		}
+		// Pass through the current incoming polyphonic signal, sorted according to the most recent "shuffling"
+		// Constrained to "FinalSize" which is the lesser of the current Output Channels and current Reorder size
+		if (int(reorder.size()) >= outputChannels) {
+			FinalSize = outputChannels;
+		} else {
+			FinalSize = reorder.size();
+		}
+		
+		for (int i = 0; i < FinalSize; i++) {
+			outputs[REORDERED_PITCH_OUTPUT].setVoltage(inputVoltages[reorder[i]], i);
+		}
+		outputs[REORDERED_PITCH_OUTPUT].setChannels(FinalSize);
+	}// End process()
+};
+
+struct ShuffleDiagram : LightWidget {
+	Shuffle* module;
+
+	ShuffleDiagram(Shuffle* module) : module(module) {}
+
+	void drawLight(const DrawArgs& args) override {
+		if (!module) return;
+		// Set up the drawing context
+		nvgSave(args.vg);
+		nvgStrokeColor(args.vg, nvgRGBA(254, 201, 1, 255));
+		nvgStrokeWidth(args.vg, 1.0);
+		// Draw the input and output dots
+		float xInput = 10;
+		float xOutput = 60;
+		float yOffset = 30;
+		float ySpacing = 120.0 / module->inputChannels-1;
+		//int CappedInput std::min(module->inputChannels,module->FinalSize);
+		for (int i = 0; i < module->inputChannels; i++) {
+			nvgFillColor(args.vg, nvgRGBA(254, 201, 1, 255));
+			nvgBeginPath(args.vg);
+			nvgCircle(args.vg, xInput, yOffset + i * ySpacing, 1.5);
+			nvgFill(args.vg);
+			if (i < module->outputChannels) {
+				nvgFillColor(args.vg, nvgRGBA(254, 201, 1, 255));
+				nvgBeginPath(args.vg);
+				nvgCircle(args.vg, xOutput, yOffset + i * ySpacing, 1.5);
+				nvgFill(args.vg);
+			}
+		}
+		// Draw the lines connecting input and output channels (up to current FinalSize, to avoid drawing undefined outputs)
+		for (int i = 0; i < module->FinalSize; i++) {
+			nvgBeginPath(args.vg);
+			nvgMoveTo(args.vg, xInput, yOffset + module->reorder[i] * ySpacing);
+			nvgLineTo(args.vg, xOutput, yOffset + i * ySpacing);
+			nvgStroke(args.vg);
+		}
+		// Restore the drawing context
+		nvgRestore(args.vg);
+	}
+};
+
+struct ShuffleWidget : ModuleWidget {
+	ShuffleWidget(Shuffle* module) {
+		setModule(module);
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/Shuffle.svg")));
+		
+		ShuffleDiagram* diagram = new ShuffleDiagram(module);
+		diagram->box.pos = Vec(10, 10);
+		diagram->box.size = Vec(50, 200);
+		addChild(diagram);
+
+		addParam(createParamCentered<BrassToggle>(mm2px(Vec(15, 6)), module, Shuffle::TOGGLE_SWITCH));
+
+		addInput(createInputCentered<BrassPort>(mm2px(Vec(8.625, 65.012)), module, Shuffle::TRIGGER_INPUT));
+		addInput(createInputCentered<BrassPort>(mm2px(Vec(8.625, 76.981)), module, Shuffle::POLYPHONIC_PITCH_INPUT));
+		addInput(createInputCentered<BrassPort>(mm2px(Vec(8.625, 88.949)), module, Shuffle::SEED_INPUT));
+		addInput(createInputCentered<BrassPort>(mm2px(Vec(8.625, 100.918)), module, Shuffle::OUTPUT_CHANNELS_INPUT));
+
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(8.625, 112.887)), module, Shuffle::REORDERED_PITCH_OUTPUT));
+	}
+};
+
+Model* modelShuffle = createModel<Shuffle, ShuffleWidget>("Shuffle");

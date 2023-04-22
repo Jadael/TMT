@@ -1,0 +1,63 @@
+{
+  "slug": "TMT",
+  "name": "T's Musical Tools",
+  "version": "2.0.0",
+  "license": "MIT",
+  "brand": "T",
+  "author": "T",
+  "authorEmail": "hillhand@gmail.com",
+  "authorUrl": "",
+  "pluginUrl": "",
+  "manualUrl": "",
+  "sourceUrl": "",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "Shuffle",
+      "name": "Shuffle",
+      "description": "Randomly re-orders the signals of a polyphonic signal. CV controls for seed and number of output channels.",
+      "tags": [
+        "Polyphonic",
+        "Random",
+        "Utility"
+      ]
+    },
+    {
+      "slug": "Calendar",
+      "name": "Calendar",
+      "description": "Outputs a variety of CVs, Triggers, and Gates related to local time and calendar.",
+      "tags": [
+        "Utility",
+        "LFO"
+      ]
+    },
+    {
+      "slug": "Seed",
+      "name": "Seed",
+      "description": "Given an input \"seed\" voltage, outputs 16 random voltages, with 16 mono outputs and 1 polyphonic output for convenience.",
+      "tags": [
+        "Random",
+        "Polyphonic"
+      ]
+    },
+    {
+      "slug": "Ouroboros",
+      "name": "Ouroboros",
+      "description": "Sequentially step through the channels of a polyphonic input.",
+      "tags": [
+        "Polyphonic",
+        "Utility"
+      ]
+    },
+    {
+      "slug": "Append",
+      "name": "Append",
+      "description": "Join up to 16 mono or polyphonic signals together into a single array, and output a CV controlled (length, rotation) subset of them as a polyphonic signal.",
+      "tags": [
+        "Polyphonic",
+        "Utility"
+      ]
+    }
+  ]
+}

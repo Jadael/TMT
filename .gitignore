@@ -1,0 +1,7 @@
+/build
+/dist
+/*.so
+/*.dylib
+/*.dll
+.DS_Store
+helper.py
