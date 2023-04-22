@@ -1,11 +1,5 @@
 # T's Musical Tools
 
-## License
-
-This project is licensed under the MIT License. See the [license.txt](license.txt) file for more information.
-
----
-
 # Shuffle
 
 ![Shuffle](screenshots/shuffle.png)
@@ -101,6 +95,8 @@ Ouroboros steps through polyphonic channels to turn it into a sequence.
 
 # Append
 
+![Append](screenshots/append.png)
+
 The Append module is a versatile Eurorack-style utility that takes in multiple input signals and combines them into a single polyphonic output with a selectable range of channels. The module allows you to control the output width and rotation to create a customizable polyphonic subset of voltages from the input signals.
 
 1. Connect up to 16 signals to the input jacks (Signal 1 to Signal 16). The module collects all channels from all connected signals into an internal buffer, in input order.
@@ -116,3 +112,9 @@ The Append module is a versatile Eurorack-style utility that takes in multiple i
 - Out: The polyphonic output containing the selected voltages from the input signals.
 
 ---
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [license.txt](license.txt) file for more information.
