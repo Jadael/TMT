@@ -27,7 +27,7 @@ struct Shuffle : Module {
 		configInput(TRIGGER_INPUT, "Shuffle Trigger");
 		configInput(POLYPHONIC_PITCH_INPUT, "Poly In");
 		configInput(SEED_INPUT, "Seed");
-		configInput(OUTPUT_CHANNELS_INPUT, "Number of Output Channels (0v-10v = 'one' to 'all')");
+		configInput(OUTPUT_CHANNELS_INPUT, "Number of Output Channels (0v 'one', to 10v 'all')");
 		configOutput(REORDERED_PITCH_OUTPUT, "Poly Out");
 	}
 	
@@ -39,7 +39,7 @@ struct Shuffle : Module {
 	size_t priorInputChannels = inputChannels;
 	size_t outputChannels = inputChannels;
 	size_t FinalSize = 12;
-	std::array<float, 16> defaultVoltages = {0.0000, 0.0833, 0.1667, 0.2500, 0.3333, 0.4167, 0.5000, 0.5833, 0.6667, 0.7500, 0.8333, 0.9167, 0.0, 0.0, 0.0, 0.0};
+	std::array<float, 16> defaultVoltages = {0.f/12, 1.f/12, 2.f/12, 3.f/12, 4.f/12, 5.f/12, 6.f/12, 7.f/12, 8.f/12, 9.f/12, 10.f/12, 11.f/12, 12.f/12, 13.f/12, 14.f/12, 15.f/12};
 	std::array<float, 16> inputVoltages = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 	size_t maxSize = 16;
 	int seed;
@@ -56,7 +56,7 @@ struct Shuffle : Module {
 				inputVoltages[i] = inputs[POLYPHONIC_PITCH_INPUT].getVoltage(i);
 			}
 		} else {
-			inputChannels = defaultVoltages.size();
+			inputChannels = 12;
 			inputVoltages = defaultVoltages;
 		}
 		
