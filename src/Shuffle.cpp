@@ -36,6 +36,7 @@ struct Shuffle : Module {
 	std::mt19937 rng{rd()};
 	std::array<int, 16> reorder = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 	size_t inputChannels = 12;
+	size_t priorInputChannels = inputChannels;
 	size_t outputChannels = inputChannels;
 	size_t FinalSize = 12;
 	std::array<float, 16> defaultVoltages = {0.0000, 0.0833, 0.1667, 0.2500, 0.3333, 0.4167, 0.5000, 0.5833, 0.6667, 0.7500, 0.8333, 0.9167, 0.0, 0.0, 0.0, 0.0};
@@ -43,7 +44,7 @@ struct Shuffle : Module {
 	size_t maxSize = 16;
 	int seed;
 	float germ;
-	bool lastToggle;
+	bool priorToggle;
 
 	void process(const ProcessArgs& args) override {
 		// Check for alt-mode toggle
@@ -101,7 +102,7 @@ struct Shuffle : Module {
 			}
 		}
 		// And/Or, if the number of input channels changed, randomize again, re-using the current seed
-		if (currentToggle != lastToggle or inputChannels != reorder.size()) {
+		if (currentToggle != priorToggle or inputChannels != priorInputChannels) {
 			// Detect and list inputs
 			for (size_t i = 0; i < inputChannels; i++) {
 				reorder[i] = i;
@@ -119,7 +120,8 @@ struct Shuffle : Module {
 					reorder[i] = randomIndex;
 				}
 			}
-			lastToggle = currentToggle;
+			priorToggle = currentToggle;
+			priorInputChannels = inputChannels;
 		}
 		// Pass through the current incoming polyphonic signal, sorted according to the most recent "shuffling"
 		// Constrained to "FinalSize" which is the lesser of the current Output Channels and current Reorder size
