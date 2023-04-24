@@ -58,6 +58,29 @@ struct SightScope : Widget {
 
         // Advance Voltage buffer one sample
         advanceBuffer(module->inputs[Sight::VOLTAGE_INPUT].getVoltage());
+		
+		// Draw dotted lines at 1 volt increments
+		nvgStrokeColor(args.vg, nvgRGBA(0, 0, 0, 128));
+		nvgStrokeWidth(args.vg, 1);
+		for (float voltage = -10.f; voltage <= 10.f; voltage += 1.f) {
+			float y = box.size.y - rescale(voltage, -10.f, 10.f, 0.f, box.size.y);
+			for (float x = 0.f; x < box.size.x; x += 10.f) {
+				nvgBeginPath(args.vg);
+				nvgMoveTo(args.vg, x, y);
+				nvgLineTo(args.vg, x + 5, y);
+				nvgStroke(args.vg);
+				nvgClosePath(args.vg);
+			}
+		}
+		
+		// Draw a horizontal black line at the zero crossing
+		nvgBeginPath(args.vg);
+		nvgMoveTo(args.vg, 0, box.size.y / 2);
+		nvgLineTo(args.vg, box.size.x, box.size.y / 2);
+		nvgStrokeColor(args.vg, nvgRGBA(0, 0, 0, 255));
+		nvgStrokeWidth(args.vg, 1);
+		nvgStroke(args.vg);
+		nvgClosePath(args.vg);
 
         // Draw the input voltages in the buffer
         nvgBeginPath(args.vg);
