@@ -13,3 +13,4 @@ extern Model* modelCalendar;
 extern Model* modelSeed;
 extern Model* modelOuroboros;
 extern Model* modelAppend;
+extern Model* modelSight;

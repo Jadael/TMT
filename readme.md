@@ -113,6 +113,16 @@ Takes multiple mono or poly input signals and combines them into a single polyph
 
 ---
 
+![Sight](screenshots/sight.png)
+
+# Sight
+A real-time, logarithmic scope. Time is shown non-linearly, letting you see a both short term and long term structures in the signal. Less precise than a normal scope; this is intended to just "keep an eye" on a signal and form an intuition for what it's up to. Scope range is -10 to +10.
+
+## Inputs / Outputs
+- **Voltage Input**: Connect any voltage source to this input to display its waveform on the scope.
+
+---
+
 ---
 
 ## License

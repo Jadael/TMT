@@ -3,5 +3,7 @@
 /*.so
 /*.dylib
 /*.dll
+/.vs
 .DS_Store
 helper.py
+makefile

@@ -58,6 +58,14 @@
         "Polyphonic",
         "Utility"
       ]
+    },
+    {
+      "slug": "Sight",
+      "name": "Sight",
+      "description": "Simple scope wih a non-linear falloff.",
+      "tags": [
+        "Visual"
+      ]
     }
   ]
 }
