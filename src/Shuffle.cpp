@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "ports.hpp"
+#include <array>
 
 struct Shuffle : Module {
 	enum ParamId {
