@@ -91,7 +91,7 @@ struct SequenceDisplay : Widget {
         box.size = Vec(bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
     }
 
-    void draw(const DrawArgs& args) override {
+    void drawLight(const DrawArgs& args) override {
 		if (!module) {
 			return;
 		}

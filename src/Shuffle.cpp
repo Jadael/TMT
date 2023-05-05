@@ -24,7 +24,7 @@ struct Shuffle : Module {
 
 	Shuffle() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Allow duplicate outputs");
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Allow duplicate channels");
 		configInput(TRIGGER_INPUT, "Shuffle Trigger");
 		configInput(POLYPHONIC_PITCH_INPUT, "Poly In");
 		configInput(SEED_INPUT, "Seed");

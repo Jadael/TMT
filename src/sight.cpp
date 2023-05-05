@@ -51,7 +51,7 @@ struct SightScope : Widget {
         return box.size.x - scalingFactor * box.size.x;
     }
 
-    void draw(const DrawArgs& args) override {
+    void drawLight(const DrawArgs& args) override {
         if (!module) {
             return;
         }
