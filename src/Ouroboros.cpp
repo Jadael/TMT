@@ -81,7 +81,7 @@ struct Ouroboros : Module {
 	}
 };
 
-struct SequenceDisplay : Widget {
+struct SequenceDisplay : LightWidget {
     Ouroboros* module;
     const Vec topLeft = Vec(10, 30);
     const Vec bottomRight = Vec(60, 120);

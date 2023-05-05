@@ -27,7 +27,7 @@ struct Sight : Module {
 	}
 };
 
-struct SightScope : Widget {
+struct SightScope : LightWidget {
     Sight* module;
     const Vec topLeft = Vec(15, 10);
     const Vec bottomRight = Vec(240, 260);
