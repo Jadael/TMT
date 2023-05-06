@@ -179,7 +179,7 @@ struct ShuffleDiagram : LightWidget {
 struct ShuffleWidget : ModuleWidget {
 	ShuffleWidget(Shuffle* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/Shuffle.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/shuffle.svg")));
 		
 		ShuffleDiagram* diagram = new ShuffleDiagram(module);
 		diagram->box.pos = Vec(10, 10);

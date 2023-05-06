@@ -99,7 +99,7 @@ struct SightScope : LightWidget {
 struct SightWidget : ModuleWidget {
 	SightWidget(Sight* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/Sight.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/sight.svg")));
 		
 		SightScope* diagram = new SightScope(module);
 		diagram->box.pos = Vec(15, 30);

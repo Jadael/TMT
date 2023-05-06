@@ -102,7 +102,7 @@ struct Append : Module {
 struct AppendWidget : ModuleWidget {
 	AppendWidget(Append* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/Append.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/append.svg")));
 
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(10.579, 13.37)), module, Append::SIGNAL01_INPUT));
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(19.901, 13.37)), module, Append::SIGNAL09_INPUT));

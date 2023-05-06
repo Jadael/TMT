@@ -139,7 +139,7 @@ struct SequenceDisplay : LightWidget {
 struct OuroborosWidget : ModuleWidget {
 	OuroborosWidget(Ouroboros* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/Ouroboros.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/ouroboros.svg")));
 		
 		SequenceDisplay* diagram = new SequenceDisplay(module);
 		diagram->box.pos = Vec(10, 10);

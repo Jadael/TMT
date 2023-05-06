@@ -69,7 +69,7 @@ struct Calendar : Module {
 		configOutput(SECOND_STEPPED_OUTPUT, "1 second stepped ramp, 4 steps");
 		configOutput(SECOND_TRIGGER_OUTPUT, "1 second trigger");
 		configOutput(SECOND_GATE_OUTPUT, "1 second gate (high during first half)");
-		configOutput(SECOND_IGATE_OUTPUT, "1 second gate (high during second half)");
+		configOutput(SECOND_IGATE_OUTPUT, "1 second inverted gate (high during second half)");
 		configOutput(MINUTE_SMOOTH_OUTPUT, "1 minute linear ramp");
 		configOutput(MINUTE_STEPPED_OUTPUT, "1 minute stepped ramp, 60 steps");
 		configOutput(MINUTE_TRIGGER_OUTPUT, "1 minute trigger");
@@ -223,7 +223,7 @@ struct Calendar : Module {
 struct CalendarWidget : ModuleWidget {
 	CalendarWidget(Calendar* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/Calendar.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/calendar.svg")));
 		
 		addParam(createParamCentered<BrassToggle>(mm2px(Vec(30, 6)), module, Calendar::TOGGLE_SWITCH));
 
