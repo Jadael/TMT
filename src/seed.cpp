@@ -2,6 +2,8 @@
 #include "ports.hpp"
 #include <random>
 
+// A description of the module!
+
 struct Seed : Module {
 	enum ParamId {
 		TOGGLE_SWITCH,
