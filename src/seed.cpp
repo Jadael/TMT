@@ -105,7 +105,7 @@ struct Seed : Module {
 struct SeedWidget : ModuleWidget {
 	SeedWidget(Seed* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/Seed.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/seed.svg")));
 		
 		addParam(createParamCentered<BrassToggle>(mm2px(Vec(15, 6)), module, Seed::TOGGLE_SWITCH));
 		
