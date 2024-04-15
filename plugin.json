@@ -1,7 +1,7 @@
 {
   "slug": "TMT",
   "name": "T's Musical Tools",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "license": "MIT",
   "brand": "T",
   "author": "T",
@@ -62,9 +62,18 @@
     {
       "slug": "Sight",
       "name": "Sight",
-      "description": "Simple scope wih a non-linear falloff.",
+      "description": "Simple scope wih a non-linear time scale.",
       "tags": [
         "Visual"
+      ]
+    },
+	{
+      "slug": "Spellbook",
+      "name": "Spellbook",
+      "description": "Play RhythML spells.",
+      "tags": [
+        "Sequencer",
+        "Polyphonic"
       ]
     }
   ]

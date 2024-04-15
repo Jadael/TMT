@@ -13,3 +13,4 @@ extern Model* modelSeed;
 extern Model* modelOuroboros;
 extern Model* modelAppend;
 extern Model* modelSight;
+extern Model* modelSpellbook;
