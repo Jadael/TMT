@@ -21,6 +21,7 @@ struct Spellbook : Module {
     };
     enum InputId {
         CLOCK_INPUT,
+		RESET_INPUT,
         INPUTS_LEN
     };
     enum OutputId {
@@ -52,28 +53,40 @@ struct Spellbook : Module {
     int currentStep = 0;  // Current step index
     std::string text;  // Stored text from the user input
     bool dirty = false;  // Flag to re-parse text when changed
+	// Initialize the last values for each channel to 0.
+	std::array<float, 16> lastValues = {};
+	// Flag to check initialization
+    bool fullyInitialized = false;
 	
 	Spellbook() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		configInput(CLOCK_INPUT, "Clock In");
+		configInput(RESET_INPUT, "Reset - UNUSED");
 		configOutput(POLY_OUTPUT, "16 voltages from columns");
-		configOutput(OUT01_OUTPUT, "1st voltage");
-		configOutput(OUT09_OUTPUT, "9th voltage");
-		configOutput(OUT02_OUTPUT, "2nd voltage");
-		configOutput(OUT10_OUTPUT, "10th voltage");
-		configOutput(OUT03_OUTPUT, "3rd voltage");
-		configOutput(OUT11_OUTPUT, "11th voltage");
-		configOutput(OUT04_OUTPUT, "4th voltage");
-		configOutput(OUT12_OUTPUT, "12th voltage");
-		configOutput(OUT05_OUTPUT, "5th voltage");
-		configOutput(OUT13_OUTPUT, "13th voltage");
-		configOutput(OUT06_OUTPUT, "6th voltage");
-		configOutput(OUT14_OUTPUT, "14th voltage");
-		configOutput(OUT07_OUTPUT, "7th voltage");
-		configOutput(OUT15_OUTPUT, "15th voltage");
-		configOutput(OUT08_OUTPUT, "8th voltage");
-		configOutput(OUT16_OUTPUT, "16th voltage");
-	}
+		configOutput(OUT01_OUTPUT, "Column 1");
+		configOutput(OUT09_OUTPUT, "Column 9");
+		configOutput(OUT02_OUTPUT, "Column 2");
+		configOutput(OUT10_OUTPUT, "Column 10");
+		configOutput(OUT03_OUTPUT, "Column 3");
+		configOutput(OUT11_OUTPUT, "Column 11");
+		configOutput(OUT04_OUTPUT, "Column 4");
+		configOutput(OUT12_OUTPUT, "Column 12");
+		configOutput(OUT05_OUTPUT, "Column 5");
+		configOutput(OUT13_OUTPUT, "Column 13");
+		configOutput(OUT06_OUTPUT, "Column 6");
+		configOutput(OUT14_OUTPUT, "Column 14");
+		configOutput(OUT07_OUTPUT, "Column 7");
+		configOutput(OUT15_OUTPUT, "Column 15");
+		configOutput(OUT08_OUTPUT, "Column 8");
+		configOutput(OUT16_OUTPUT, "Column 16");
+		
+        // Set outputs to a safe initial state
+		outputs[POLY_OUTPUT].setChannels(16);
+        for (int i = 0; i < 16; ++i) {
+            outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
+        }
+        fullyInitialized = true; // Mark as fully initialized at the end of constructor
+    }
 	
 
     void onReset() override {
@@ -171,20 +184,24 @@ struct Spellbook : Module {
 			while (getline(lineStream, cell, ',') && index < 16) {
 				cell.erase(std::remove_if(cell.begin(), cell.end(), ::isspace), cell.end());
 				
-				if (cell == "X") {
-					stepData[index] = 10.0f;
-				} else if (isDecimal(cell)) {  // Check if it's a decimal
-					try {
-						stepData[index] = std::stof(cell);
-					} catch (...) {
-						stepData[index] = 0.0f;  // Default to 0 if parsing fails
+				try {
+					if (cell == "X") {
+						stepData[index] = 10.0f;
+					} else if (isDecimal(cell)) {  // Check if it's a decimal
+						try {
+							stepData[index] = std::stof(cell);
+						} catch (...) {
+							stepData[index] = 0.0f;  // Default to 0 if parsing fails
+						}
+					} else {
+						try {
+							stepData[index] = parsePitch(cell);
+						} catch (...) {
+							stepData[index] = 0.0f;  // Default to 0 if parsing fails
+						}
 					}
-				} else {
-					try {
-						stepData[index] = parsePitch(cell);
-					} catch (...) {
-						stepData[index] = 0.0f;  // Default to 0 if parsing fails
-					}
+				} catch (...) {
+					stepData[index] = 0.0f;  // Default to 0 if parsing fails
 				}
 				index++;
 			}
@@ -203,34 +220,35 @@ struct Spellbook : Module {
 			parseText();
 			dirty = false;
 		}
-		if (!steps.empty() && clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
-			currentStep = (currentStep + 1) % steps.size();  // Move to the next step, wrap around
+
+		if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
+			if (!steps.empty()) {
+				// Only update the step if we have steps available
+				currentStep = (currentStep + 1) % steps.size();
+			}
 		}
 
+		// Make sure polyphonic output has 16 channels
+		outputs[POLY_OUTPUT].setChannels(16);
+
 		if (!steps.empty()) {
-			std::vector<float> &currentValues = steps[currentStep];
-			int numChannels = std::min((int)currentValues.size(), 16); // Ensure we do not exceed 16 channels
-
-			// Set number of channels for polyphonic output
-			outputs[POLY_OUTPUT].setChannels(numChannels);
-			
-			for (int i = 0; i < numChannels; i++) {
-				outputs[OUT01_OUTPUT + i].setVoltage(currentValues[i]);
-				outputs[POLY_OUTPUT].setVoltage(currentValues[i], i);
-			}
-
-			// Zero the rest of the outputs
-			for (int i = numChannels; i < 16; i++) {
-				outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
-				outputs[POLY_OUTPUT].setVoltage(0.0f, i);
+			std::vector<float>& currentValues = steps[currentStep];
+			for (int i = 0; i < 16; i++) {
+				// If the current step has a value for this channel, update lastValues
+				if (i < (int)currentValues.size() && !std::isnan(currentValues[i])) {
+					lastValues[i] = currentValues[i];
+				}
+				// Update the output voltages to the last known values
+				outputs[OUT01_OUTPUT + i].setVoltage(lastValues[i]);
+				outputs[POLY_OUTPUT].setVoltage(lastValues[i], i);
 			}
 		} else {
-			// Zero all outputs if there are no steps
+			// If there are no steps, we do nothing, retaining the last known values.
+			// This is safe because we initialize lastValues to 0 and never let them be NaN.
 			for (int i = 0; i < 16; i++) {
-				outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
-				outputs[POLY_OUTPUT].setVoltage(0.0f, i);
+				outputs[OUT01_OUTPUT + i].setVoltage(lastValues[i]);
+				outputs[POLY_OUTPUT].setVoltage(lastValues[i], i);
 			}
-			outputs[POLY_OUTPUT].setChannels(16);  // Default to 16 channels, all zeroed
 		}
 	}
 
@@ -238,43 +256,84 @@ struct Spellbook : Module {
 
 struct SpellbookTextField : LedDisplayTextField {
     Spellbook* module;
+    NVGcolor goldColor = nvgRGB(255, 215, 0); // Gold color for the dot
 
-    // This constructor ensures the text field is initialized with the current text.
     SpellbookTextField() {
-        if (module) {
-            setText(module->text);
-        }
+        // Constructor body remains empty
+    }
+
+    void draw(const DrawArgs& args) override {
+        LedDisplayTextField::draw(args);
+
+        if (!module || !module->fullyInitialized) return;
+
+        // Calculate the y-position of the dot based on the current step and line height
+        float lineHeight = 12.0f;  // Assuming each line of text is roughly 10 pixels high, adjust as necessary
+        float yPos = (module->currentStep * lineHeight);
+
+        // Draw a gold dot at the calculated position
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, 3, yPos+lineHeight+3, 3); // Draw circle at x=5px, calculated yPos, radius=5px
+        nvgFillColor(args.vg, goldColor);
+        nvgFill(args.vg);
     }
 
     void step() override {
+        if (!module || !module->fullyInitialized) return;
+
         LedDisplayTextField::step();
-        // Update the text field only if it's dirty and the text is different
-        // to avoid unnecessary updates that can cause cursor or scroll issues.
-        if (module && module->dirty && getText() != module->text) {
+        if (module->dirty && getText() != module->text) {
             setText(module->text);
             module->dirty = false;
         }
     }
 
-	void onChange(const ChangeEvent& e) override {
-		if (module) {
-			std::string cleanedText;
-			std::string originalText = getText();
+    void onChange(const ChangeEvent& e) override {
+        if (!module || !module->fullyInitialized) return; // Prevent changes if module not ready
 
-			// Remove all unwanted characters
-			for (char &c : originalText) {
-				if (c >= 32 && c <= 126) { // ASCII printable characters
-					cleanedText += c;
-				} else if (c == '\n' || c == '\r') { // Convert all types of newlines to just '\n'
-					cleanedText += '\n';
-				}
-				// You can add more conditions here to handle other types of characters
-			}
+        std::string originalText = getText();
+        std::istringstream ss(originalText);
+        std::string line;
+        std::vector<std::vector<std::string>> rows;
+        std::vector<size_t> columnWidths;
 
-			module->text = cleanedText;
-			module->dirty = true;
-			setText(cleanedText); // Update the text field to show the cleaned text
-		}
+        while (std::getline(ss, line)) {
+            std::istringstream lineStream(line);
+            std::string cell;
+            std::vector<std::string> cells;
+            size_t columnIndex = 0;
+
+            while (std::getline(lineStream, cell, ',')) {
+                cell.erase(cell.find_last_not_of(" \n\r\t") + 1);
+                cell.erase(0, cell.find_first_not_of(" \n\r\t"));
+                cells.push_back(cell);
+
+                if (columnWidths.size() <= columnIndex) {
+                    columnWidths.push_back(cell.size());
+                } else {
+                    columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
+                }
+                ++columnIndex;
+            }
+            rows.push_back(cells);
+        }
+
+        std::string cleanedText;
+        for (auto& row : rows) {
+            for (size_t i = 0; i < row.size(); ++i) {
+                cleanedText += row[i] + std::string(columnWidths[i] - row[i].size(), ' ');
+                if (i < row.size() - 1) cleanedText += ", ";
+            }
+            cleanedText += '\n';
+        }
+
+        if (!cleanedText.empty() && cleanedText.back() == '\n') {
+            cleanedText.erase(cleanedText.size() - 1);
+        }
+
+        module->text = cleanedText;
+        module->dirty = true;
+        setText(cleanedText);
     }
 };
 
@@ -284,28 +343,29 @@ struct SpellbookWidget : ModuleWidget {
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/spellbook.svg")));
 		
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(11.331, 14.933)), module, Spellbook::CLOCK_INPUT));
+		addInput(createInputCentered<BrassPort>(mm2px(Vec(11.331, 27.166)), module, Spellbook::RESET_INPUT));
 		
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654, 14.933)), module, Spellbook::POLY_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331, 27.166)), module, Spellbook::OUT01_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654, 27.166)), module, Spellbook::OUT09_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331, 39.399)), module, Spellbook::OUT02_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654, 39.399)), module, Spellbook::OUT10_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331, 51.632)), module, Spellbook::OUT03_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654, 51.632)), module, Spellbook::OUT11_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331, 63.866)), module, Spellbook::OUT04_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654, 63.866)), module, Spellbook::OUT12_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331, 76.099)), module, Spellbook::OUT05_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654, 76.099)), module, Spellbook::OUT13_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331, 88.332)), module, Spellbook::OUT06_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654, 88.332)), module, Spellbook::OUT14_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331, 100.566)), module, Spellbook::OUT07_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654, 100.566)), module, Spellbook::OUT15_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331, 112.799)), module, Spellbook::OUT08_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654, 112.799)), module, Spellbook::OUT16_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654+209.848-(11.331/2), 14.933)), module, Spellbook::POLY_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331+209.848, 27.166)), module, Spellbook::OUT01_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654+209.848, 27.166)), module, Spellbook::OUT09_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331+209.848, 39.399)), module, Spellbook::OUT02_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654+209.848, 39.399)), module, Spellbook::OUT10_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331+209.848, 51.632)), module, Spellbook::OUT03_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654+209.848, 51.632)), module, Spellbook::OUT11_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331+209.848, 63.866)), module, Spellbook::OUT04_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654+209.848, 63.866)), module, Spellbook::OUT12_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331+209.848, 76.099)), module, Spellbook::OUT05_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654+209.848, 76.099)), module, Spellbook::OUT13_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331+209.848, 88.332)), module, Spellbook::OUT06_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654+209.848, 88.332)), module, Spellbook::OUT14_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331+209.848, 100.566)), module, Spellbook::OUT07_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654+209.848, 100.566)), module, Spellbook::OUT15_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(11.331+209.848, 112.799)), module, Spellbook::OUT08_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(20.654+209.848, 112.799)), module, Spellbook::OUT16_OUTPUT));
 		
         // Create the text field widget.
         SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(33.992, 0)));
-        textField->box.size = mm2px(Vec(209.848, RACK_GRID_HEIGHT));
+        textField->box.size = mm2px(Vec(209.848-20.654-11.331, RACK_GRID_HEIGHT));
         textField->multiline = true;
         textField->module = module;
         // If the module is loaded, set the text to the current content of the module's text buffer.
