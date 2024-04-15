@@ -142,8 +142,6 @@ struct Spellbook : Module {
 	}
 	
 	float parsePitch(const std::string& cell) {
-		if (cell == "X") return 10.0f;
-
 		// Iterate over the noteToSemitone map and try to find a matching note name
 		for (const auto& notePair : noteToSemitone) {
 			const std::string& noteName = notePair.first;
@@ -181,10 +179,12 @@ struct Spellbook : Module {
 					} catch (...) {
 						stepData[index] = 0.0f;  // Default to 0 if parsing fails
 					}
-				} else if (noteToSemitone.find(cell) != noteToSemitone.end()) {  // Check if it's a note
-					stepData[index] = parsePitch(cell);
 				} else {
-					stepData[index] = 0.0f;  // Default to 0 if neither
+					try {
+						stepData[index] = parsePitch(cell);
+					} catch (...) {
+						stepData[index] = 0.0f;  // Default to 0 if parsing fails
+					}
 				}
 				index++;
 			}
