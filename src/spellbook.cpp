@@ -6,6 +6,28 @@
 #include <iomanip>
 #define GRID_SNAP 10.16
 
+struct StepData {
+    float voltage;
+    char type;  // 'N' for normal, 'T' for trigger, 'R' for retrigger
+};
+
+struct Timer {
+    float timeLeft = 0.0f;  // Time left in seconds
+
+    // Reset to 10 ms
+    void reset() {
+        timeLeft = 0.01f;  // Set timer for 10 ms
+    }
+
+    // Update the timer and check if the period has expired
+    bool update(float deltaTime) {
+        if (timeLeft > 0.0f) {
+            timeLeft -= deltaTime;
+        }
+        return timeLeft <= 0.0f;
+    }
+};
+
 struct Spellbook : Module {
     enum ParamId {
         TOGGLE_SWITCH,
@@ -30,14 +52,15 @@ struct Spellbook : Module {
 
     dsp::SchmittTrigger clockTrigger;
 	dsp::SchmittTrigger resetTrigger;
-    std::vector<std::vector<float>> steps;
-    std::vector<float> lastValues;  // Changed from std::array to std::vector
+    std::vector<std::vector<StepData>> steps;
+	Timer triggerTimer;
+    std::vector<StepData> lastValues;
     int currentStep = 0;
     std::string text;
     bool dirty = false;
     bool fullyInitialized = false;
     
-    Spellbook() : lastValues(16, 0.0f) {  // Initialize lastValues with 16 zeros
+	Spellbook() : lastValues(16, {0.0f, 'N'}) {  // Initialize lastValues with 16 zeros
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
         configInput(CLOCK_INPUT, "Clock / Next Step");
         configInput(RESET_INPUT, "Reset");
@@ -140,7 +163,7 @@ struct Spellbook : Module {
 		std::istringstream ss(text);
 		std::string line;
 		while (getline(ss, line)) {
-			std::vector<float> stepData(16, 0.0f);  // Default all steps to 0.0 volts
+			std::vector<StepData> stepData(16, StepData{0.0f, 'N'});  // Default all steps to 0.0 volts, normal type
 			std::istringstream lineStream(line);
 			std::string cell;
 			int index = 0;
@@ -153,32 +176,40 @@ struct Spellbook : Module {
 							   [](unsigned char c) { return std::toupper(c); });  // Convert to upper case
 				cell.erase(std::remove_if(cell.begin(), cell.end(), ::isspace), cell.end());  // Clean cell from spaces
 				
-				float value = 0.0f;  // Default cell value
 				if (!cell.empty()) {
-					if (cell[0] == 'X') {
-						value = 10.0f;  // Treat 'X' as a gate signal (10 volts)
+					if (cell == "X") {
+						stepData[index].voltage = 10.0f;  // Treat 'X' as a gate signal (10 volts)
+						stepData[index].type = 'N';  // Normal gate
+					} else if (cell == "T") {
+						stepData[index].voltage = 10.0f;
+						stepData[index].type = 'T';  // 10ms Trigger signal
+					} else if (cell == "R") {
+						stepData[index].voltage = 10.0f;
+						stepData[index].type = 'R';  // Retrigger signal (0 for 10ms at start of step)
 					} else if (isDecimal(cell)) {
-						value = std::stof(cell);  // Convert decimal string to float
+						stepData[index].voltage = std::stof(cell);
+						stepData[index].type = 'N';
 					} else {
-						value = parsePitch(cell);  // Parse pitch from note names
+						stepData[index].voltage = parsePitch(cell);
+						stepData[index].type = 'N';
 					}
 				}
-				stepData[index++] = value;
+				index++;
 			}
 			steps.push_back(stepData);
 		}
 
 		if (steps.empty()) {
-			steps.push_back(std::vector<float>(16, 0.0f));  // Ensure at least one step exists
+			steps.push_back(std::vector<StepData>(16, StepData{0.0f, 'N'}));
 		}
 
-		// Modulo the current step to ensure it's within the new range of steps
 		currentStep = currentStep % steps.size();
 	}
 
     void process(const ProcessArgs& args) override {
         if (resetTrigger.process(inputs[RESET_INPUT].getVoltage())) {
-			currentStep = 0;
+            currentStep = 0;
+            triggerTimer.reset();
             dirty = true;
         }
 
@@ -186,46 +217,42 @@ struct Spellbook : Module {
             parseText();
             dirty = false;
         }
-		
+
         if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
-            if (!steps.empty()) {
-                currentStep = (currentStep + 1) % steps.size();
-            }
+            currentStep = (currentStep + 1) % steps.size();
+            triggerTimer.reset();  // Reset timer at new step
         }
 
         outputs[POLY_OUTPUT].setChannels(16);
-        std::vector<float>& currentValues = steps.empty() ? lastValues : steps[currentStep];
+        std::vector<StepData>& currentValues = steps.empty() ? lastValues : steps[currentStep];
 
         for (int i = 0; i < 16; i++) {
-            float outputValue = (i < (int)currentValues.size()) ? currentValues[i] : lastValues[i];
+            StepData& step = currentValues[i];
+            float outputValue = step.voltage;
+
+            switch (step.type) {
+                case 'T':  // Trigger
+                    if (!triggerTimer.update(args.sampleTime)) {
+                        outputValue = 10.0f;  // Keep high for the first 10ms
+                    } else {
+                        outputValue = 0.0f;  // Then drop to 0V
+                    }
+                    break;
+                case 'R':  // Retrigger
+                    if (!triggerTimer.update(args.sampleTime)) {
+                        outputValue = 0.0f;  // Keep low for the first 10ms
+                    } else {
+                        outputValue = 10.0f;  // Then rise to 10V
+                    }
+                    break;
+                default:
+                    break;  // Normal behavior for other types
+            }
+
             outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
             outputs[POLY_OUTPUT].setVoltage(outputValue, i);
-            lastValues[i] = outputValue;  // Ensure lastValues is always updated
+            lastValues[i] = step;  // Update last known values
         }
-    }
-};
-
-struct TriggerState {
-    float voltage = 0.0f;
-    int remainingTime = 0; // Time in milliseconds for which the trigger should still be active
-
-    void trigger(int durationMs) {
-        voltage = 10.0f;
-        remainingTime = durationMs;
-    }
-
-    void process(float sampleRate) {
-        if (remainingTime > 0) {
-            remainingTime -= std::max(1, static_cast<int>(std::floor(1000.0f / sampleRate)));
-            if (remainingTime <= 0) {
-                voltage = 0.0f;
-                remainingTime = 0;
-            }
-        }
-    }
-
-    float getVoltage() const {
-        return voltage;
     }
 };
 
