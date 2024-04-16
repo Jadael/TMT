@@ -163,7 +163,7 @@ struct Spellbook : Module {
 		std::istringstream ss(text);
 		std::string line;
 		while (getline(ss, line)) {
-			std::vector<StepData> stepData(16, StepData{0.0f, 'N'});  // Default all steps to 0.0 volts, normal type
+			std::vector<StepData> stepData(16, StepData{0.0f, 'E'});  // Default all steps to 0.0 volts, empty type
 			std::istringstream lineStream(line);
 			std::string cell;
 			int index = 0;
@@ -179,7 +179,7 @@ struct Spellbook : Module {
 				if (!cell.empty()) {
 					if (cell == "X") {
 						stepData[index].voltage = 10.0f;  // Treat 'X' as a gate signal (10 volts)
-						stepData[index].type = 'N';  // Normal gate
+						stepData[index].type = 'G';  // Gate
 					} else if (cell == "T") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'T';  // 10ms Trigger signal
@@ -194,6 +194,7 @@ struct Spellbook : Module {
 						stepData[index].type = 'N';
 					}
 				}
+					
 				index++;
 			}
 			steps.push_back(stepData);
@@ -228,7 +229,7 @@ struct Spellbook : Module {
 
         for (int i = 0; i < 16; i++) {
             StepData& step = currentValues[i];
-            float outputValue = step.voltage;
+            float outputValue = step.voltage;  // Start with the last known voltage
 
             switch (step.type) {
                 case 'T':  // Trigger
@@ -245,13 +246,27 @@ struct Spellbook : Module {
                         outputValue = 10.0f;  // Then rise to 10V
                     }
                     break;
+                case 'N':  // Normal pitch or CV
+                    //if (step.voltage != 0.0f || step.voltage == lastValues[i].voltage) {
+                        outputValue = step.voltage;  // Normal pitch
+                    //}
+                    break;
+                case 'E':  // Empty cells, check to see if we need to end a gate
+                    if (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R' ) {
+                        outputValue = 0.0f;  // Zero on empty cells, if last value was a gate or trigger
+                    } else {
+						outputValue = lastValues[i].voltage; // Otherwise continue last voltage
+					}
+                    break;
                 default:
-                    break;  // Normal behavior for other types
+                    // If there's no specific type and the cell was empty, keep last voltage (do nothing)
+                    break;  // Leave outputValue as last known voltage if not explicitly set
             }
 
             outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
             outputs[POLY_OUTPUT].setVoltage(outputValue, i);
-            lastValues[i] = step;  // Update last known values
+            lastValues[i].voltage = outputValue;  // Update last known values
+            lastValues[i].type = step.type;       // Update last known type
         }
     }
 };
