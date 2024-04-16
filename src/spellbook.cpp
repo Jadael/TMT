@@ -60,7 +60,7 @@ struct Spellbook : Module {
 	
 	Spellbook() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configInput(CLOCK_INPUT, "Clock In");
+		configInput(CLOCK_INPUT, "Clock / Next Step");
 		configInput(RESET_INPUT, "Reset - UNUSED");
 		configOutput(POLY_OUTPUT, "16 voltages from columns");
 		configOutput(OUT01_OUTPUT, "Column 1");
@@ -132,7 +132,7 @@ struct Spellbook : Module {
 			}
 			++it;
 		}
-		return it == s.end() && s.size() > minSize;  // True if all characters are digits or one decimal
+		return it == s.end() && s.size() > static_cast<std::string::size_type>(minSize);  // True if all characters are digits or one decimal
 	}
 	
 	float noteNameToVoltage(const std::string& noteName, int octave) {
@@ -259,7 +259,6 @@ struct SpellbookTextField : LedDisplayTextField {
     NVGcolor goldColor = nvgRGB(255, 215, 0); // Gold color for the dot
 
     SpellbookTextField() {
-        // Constructor body remains empty
     }
 
     void draw(const DrawArgs& args) override {
@@ -268,7 +267,7 @@ struct SpellbookTextField : LedDisplayTextField {
         if (!module || !module->fullyInitialized) return;
 
         // Calculate the y-position of the dot based on the current step and line height
-        float lineHeight = 12.0f;  // Assuming each line of text is roughly 10 pixels high, adjust as necessary
+        float lineHeight = 12.0f;  // Assuming each line of text is roughly 12 pixels high, adjust as necessary
         float yPos = (module->currentStep * lineHeight);
 
         // Draw a gold dot at the calculated position
@@ -288,53 +287,59 @@ struct SpellbookTextField : LedDisplayTextField {
         }
     }
 
-    void onChange(const ChangeEvent& e) override {
-        if (!module || !module->fullyInitialized) return; // Prevent changes if module not ready
+	void onChange(const ChangeEvent& e) override {
+		if (!module || !module->fullyInitialized) return; // Prevent changes if module not ready
 
-        std::string originalText = getText();
-        std::istringstream ss(originalText);
-        std::string line;
-        std::vector<std::vector<std::string>> rows;
-        std::vector<size_t> columnWidths;
+		std::string originalText = getText();
+		std::istringstream ss(originalText);
+		std::string line;
+		std::vector<std::vector<std::string>> rows;
+		std::vector<size_t> columnWidths;
 
-        while (std::getline(ss, line)) {
-            std::istringstream lineStream(line);
-            std::string cell;
-            std::vector<std::string> cells;
-            size_t columnIndex = 0;
+		// Parse the input text into rows and columns, computing column widths
+		while (std::getline(ss, line)) {
+			std::istringstream lineStream(line);
+			std::string cell;
+			std::vector<std::string> cells;
+			size_t columnIndex = 0;
 
-            while (std::getline(lineStream, cell, ',')) {
-                cell.erase(cell.find_last_not_of(" \n\r\t") + 1);
-                cell.erase(0, cell.find_first_not_of(" \n\r\t"));
-                cells.push_back(cell);
+			while (std::getline(lineStream, cell, ',')) {
+				cell.erase(cell.find_last_not_of(" \n\r\t") + 1); // Trim trailing whitespace
+				cell.erase(0, cell.find_first_not_of(" \n\r\t")); // Trim leading whitespace
+				cells.push_back(cell);
 
-                if (columnWidths.size() <= columnIndex) {
-                    columnWidths.push_back(cell.size());
-                } else {
-                    columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
-                }
-                ++columnIndex;
-            }
-            rows.push_back(cells);
-        }
+				if (columnWidths.size() <= columnIndex) {
+					columnWidths.push_back(cell.size());
+				} else {
+					columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
+				}
+				++columnIndex;
+			}
+			rows.push_back(cells);
+		}
 
-        std::string cleanedText;
-        for (auto& row : rows) {
-            for (size_t i = 0; i < row.size(); ++i) {
-                cleanedText += row[i] + std::string(columnWidths[i] - row[i].size(), ' ');
-                if (i < row.size() - 1) cleanedText += ", ";
-            }
-            cleanedText += '\n';
-        }
+		// Construct the cleaned text with proper padding and commas
+		std::string cleanedText;
+		for (size_t rowIdx = 0; rowIdx < rows.size(); ++rowIdx) {
+			auto& row = rows[rowIdx];
+			for (size_t i = 0; i < row.size(); ++i) {
+				cleanedText += row[i];
+				if (i < columnWidths.size() - 1) { // Add padding spaces
+					cleanedText += std::string(columnWidths[i] - row[i].size(), ' ');
+				}
+				if (i < row.size() - 1) { // Add comma and space
+					cleanedText += ", ";
+				}
+			}
+			if (rowIdx < rows.size() - 1) { // Add newline if it's not the last row
+				cleanedText += '\n';
+			}
+		}
 
-        if (!cleanedText.empty() && cleanedText.back() == '\n') {
-            cleanedText.erase(cleanedText.size() - 1);
-        }
-
-        module->text = cleanedText;
-        module->dirty = true;
-        setText(cleanedText);
-    }
+		module->text = cleanedText;
+		module->dirty = true;
+		setText(cleanedText); // Update the text field to show the cleaned text
+	}
 };
 
 struct SpellbookWidget : ModuleWidget {
