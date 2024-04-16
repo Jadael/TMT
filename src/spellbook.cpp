@@ -145,7 +145,14 @@ struct Spellbook : Module {
 			std::string cell;
 			int index = 0;
 			while (getline(lineStream, cell, ',') && index < 16) {
+				size_t commentPos = cell.find('?');
+				if (commentPos != std::string::npos) {
+					cell = cell.substr(0, commentPos);  // Remove the comment part
+				}
+				std::transform(cell.begin(), cell.end(), cell.begin(),
+							   [](unsigned char c) { return std::toupper(c); });  // Convert to upper case
 				cell.erase(std::remove_if(cell.begin(), cell.end(), ::isspace), cell.end());  // Clean cell from spaces
+				
 				float value = 0.0f;  // Default cell value
 				if (!cell.empty()) {
 					if (cell[0] == 'X') {
@@ -262,54 +269,79 @@ struct SpellbookTextField : LedDisplayTextField {
     SpellbookTextField() {
         this->multiline = true;  // Allow multiple lines
     }
+	
 
-    void onDeselect(const DeselectEvent& e) override {
-        if (!module || !module->fullyInitialized) return;
+	void onDeselect(const DeselectEvent& e) override {
+		std::string originalText = getText();
+		std::string cleanedText = cleanAndPadText(originalText);
+		
+		if (module) {
+			module->text = cleanedText;
+			module->dirty = true;
+		}
 
-        std::string cleanedText = cleanAndPadText(this->getText());
-        module->text = cleanedText;
-        module->dirty = true;
-    }
+		setText(cleanedText);  // This should also trigger the widget to update its display
+	}
 
-    std::string cleanAndPadText(const std::string& originalText) {
-        std::istringstream ss(originalText);
-        std::string line;
-        std::vector<std::vector<std::string>> rows;
-        std::vector<size_t> columnWidths;
+	std::string cleanAndPadText(const std::string& originalText) {
+		std::istringstream ss(originalText);
+		std::string line;
+		std::vector<std::vector<std::string>> rows;
+		std::vector<size_t> columnWidths;
 
-        while (std::getline(ss, line)) {
-            std::istringstream lineStream(line);
-            std::string cell;
-            std::vector<std::string> cells;
-            size_t columnIndex = 0;
+		size_t maxColumns = 0;
 
-            while (std::getline(lineStream, cell, ',')) {
-                cell.erase(cell.find_last_not_of(" \n\r\t") + 1);
-                cell.erase(0, cell.find_first_not_of(" \n\r\t"));
-                cells.push_back(cell);
+		// First pass: fill rows and find maximum column widths and the maximum number of columns
+		while (std::getline(ss, line)) {
+			std::istringstream lineStream(line);
+			std::string cell;
+			std::vector<std::string> cells;
+			size_t columnIndex = 0;
 
-                if (columnWidths.size() <= columnIndex) {
-                    columnWidths.push_back(cell.size());
-                } else {
-                    columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
-                }
-                ++columnIndex;
-            }
-            rows.push_back(cells);
-        }
+			while (std::getline(lineStream, cell, ',')) {
+				cell.erase(cell.find_last_not_of(" \n\r\t") + 1); // Trim trailing whitespace
+				cell.erase(0, cell.find_first_not_of(" \n\r\t")); // Trim leading whitespace
+				cells.push_back(cell);
 
-        std::string cleanedText;
-        for (auto& row : rows) {
-            for (size_t i = 0; i < row.size(); ++i) {
-                cleanedText += row[i];
-                if (i < row.size() - 1) {
-                    cleanedText += std::string(columnWidths[i] - row[i].size(), ' ') + ", ";
-                }
-            }
-            cleanedText += '\n';
-        }
-        return cleanedText;
-    }
+				if (columnIndex >= columnWidths.size()) {
+					columnWidths.push_back(cell.size());
+				} else {
+					columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
+				}
+				columnIndex++;
+			}
+			maxColumns = std::max(maxColumns, cells.size());
+			rows.push_back(cells);
+		}
+
+		// Normalize the number of columns in all rows
+		for (auto& row : rows) {
+			while (row.size() < maxColumns) {
+				row.push_back("");  // Add empty strings for missing columns
+			}
+		}
+
+		// Second pass: construct the cleaned text with proper padding and commas
+		std::string cleanedText;
+		for (auto& row : rows) {
+			for (size_t i = 0; i < row.size(); ++i) {
+				cleanedText += row[i];
+				if (i < row.size() - 1) {
+					// Pad with spaces if not the last column
+					cleanedText += std::string(columnWidths[i] - row[i].size(), ' ');
+					cleanedText += ", ";
+				} else {
+					// Ensure even the last column in each row is right-padded if necessary
+					if (row.size() < columnWidths.size()) {
+						cleanedText += std::string(columnWidths[i] - row[i].size(), ' ');
+					}
+				}
+			}
+			cleanedText += '\n';
+		}
+
+		return cleanedText;
+	}
 };
 
 struct SpellbookWidget : ModuleWidget {
