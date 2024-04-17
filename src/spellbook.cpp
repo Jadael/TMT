@@ -293,9 +293,9 @@ struct StepIndicatorField : LedDisplayTextField {
             std::string paddedStepNumber = std::string(maxDigits - stepNumber.length(), ' ') + stepNumber;  // Pad with spaces
 
             if (i == module->currentStep) {
-                oss << ">" << paddedStepNumber << "\n";  // Mark the current step
+                oss << ">" << paddedStepNumber << "|\n";  // Mark the current step
             } else {
-                oss << " " << paddedStepNumber << "\n";
+                oss << " " << paddedStepNumber << "|\n";
             }
         }
         this->setText(oss.str());
