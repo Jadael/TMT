@@ -127,7 +127,7 @@ A real-time, logarithmic scope. Time is shown non-linearly, letting you see a bo
 
 ![Spellbook](screenshots/spellbook.png)
 
-Spellbook is a module to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs (and a polyphonic output which combines all of them), each of which outputs a voltage determined by the corresponding column in RhythML-formatted text input. Spellbook is not yet in the VCV Rack Library version of this plugin; check [Releases](/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
+Spellbook is a module to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs (and a polyphonic output which combines all of them), each of which outputs a voltage determined by the corresponding column in RhythML-formatted text input. Spellbook is not yet in the VCV Rack Library version of this plugin; check [Releases](https://github.com/Jadael/TMT/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
 
 ## Inputs & Outputs
 
