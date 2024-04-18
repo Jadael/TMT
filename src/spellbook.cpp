@@ -16,7 +16,7 @@ struct Timer {
 
     // Reset to 10 ms
     void reset() {
-        timeLeft = 0.01f;  // Set timer for 10 ms
+        timeLeft = 0.001f;  // Set timer for 1 ms
     }
 
     // Update the timer and check if the period has expired
