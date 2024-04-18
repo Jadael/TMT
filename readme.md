@@ -123,6 +123,43 @@ A real-time, logarithmic scope. Time is shown non-linearly, letting you see a bo
 
 ---
 
+# Spellbook (ALPHA RELEASE)
+
+![Spellbook](screenshots/spellbook.png)
+
+Spellbook is a module to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs (and a polyphonic output which combines all of them), each of which outputs a voltage determined by the corresponding column in RhythML-formatted text input. Spellbook is not yet in the VCV Rack Library version of this plugin.
+
+## Inputs & Outputs
+
+- **Clock Input**: Advances to the next step in the sequence on the rising edge of each clock signal.
+- **Reset Input**: Resets the sequence to the first step on the rising edge of the input signal.
+- **Poly Out**: Outputs all 16 voltages as a polyphonic signal.
+- **Out 1 - Out 16**: Individual outputs for each column specified in the RhythML sequence.
+
+## Sequencing with RhythML
+
+Spellbook sequences are programmed using the RhythML format, a syntax to define pitch and CV patterns in plain text. Each line in the text input represents a sequence step, triggered sequentially by the clock input. Columns in the text represent the 16 outputs, allowing for complex configurations across multiple hardware modules.
+
+### RhythML Features
+- **Decimal Voltages**: Directly specify voltage outputs by writing decimal numbers.
+- **Gate and Trigger Commands**: Use `X` for full-width gates, `T` for a 10ms trigger pulse, or `R` for a 10ms re-trigger; as shorthand for rhythmic sequences.
+- **Scientific Pitch Names**: Specify pitches using standard note names (e.g., `C4`, `G#3`), and they are parsed to 1V/oct standard.
+
+Refer to [RhythML Syntax Specification](RhythML.md) for comprehensive guidelines on writing sequences for Spellbook.
+
+### Usage Example
+
+Here's a simple RhythML sequence to get started:
+
+```
+E4 ? Pitch, X ? Gate, 10 ? Velocity
+C5        , T       , 8
+D5        , T       , 6
+B4        , T       , 5
+```
+
+In this example, each step sets a pitch in column 1, uses column 2 for gating, and controls a velocity CV in column 3. The sequence plays a C major arpeggio, holding the first note for a full beat, and gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored because of the `?`.
+
 ---
 
 ## License
