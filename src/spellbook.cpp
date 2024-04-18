@@ -4,9 +4,7 @@
 #include <vector>
 #include <map>
 #include <iomanip>
-
 #define GRID_SNAP 10.16
-#define LINE_HEIGHT 11.5  // Height of one line of text in pixels
 
 struct StepData {
     float voltage;
@@ -309,11 +307,51 @@ struct StepIndicatorField : LedDisplayTextField {
 
 struct SpellbookTextField : LedDisplayTextField {
     Spellbook* module;
+	StepIndicatorField* stepField;
+	float minY = 0.0f, maxY = 0.0f;
+	const float lineHeight = 12.0f;
 
     SpellbookTextField() {
         this->multiline = true;  // Allow multiple lines
+		this->box.pos = Vec(0, 0);
+		this->box.size = Vec(0, RACK_GRID_HEIGHT); // Initial height
     }
 	
+    void setScrollLimits(float contentHeight, float viewportHeight) {
+        if (contentHeight > viewportHeight) {
+            minY = viewportHeight - contentHeight;  // Content is taller, allow scrolling up
+            maxY = 0.0f;  // Bottom align when fully scrolled up
+        } else {
+            minY = 0.0f;  // Content is shorter, no need to scroll
+            maxY = 0.0f;  // Keep top aligned
+        }
+    }
+
+    void onHoverScroll(const event::HoverScroll &e) override {
+        Widget::onHoverScroll(e);
+        float delta = e.scrollDelta.y * 1.0f; // Adjust scroll speed if necessary
+        float newY = clamp(box.pos.y + delta, minY, maxY);
+		box.pos.y = newY;
+		stepField->box.pos.y = newY;
+        e.consume(this);
+    }
+	
+    void updateSizeAndPosition() {
+        std::string text = getText();
+        size_t lineCount = std::count(text.begin(), text.end(), '\n') + 1;
+        float contentHeight = lineCount * lineHeight;
+        
+        float newHeight = std::max(contentHeight, static_cast<float>(RACK_GRID_HEIGHT));
+		
+		// Resize the widget
+        setScrollLimits(contentHeight, RACK_GRID_HEIGHT);
+		setSize(Vec(box.size.x, newHeight));
+
+        // Resize stepField to match
+        if (stepField) {
+            stepField->box.size.y = newHeight;
+        }
+    }
 
 	void onDeselect(const DeselectEvent& e) override {
 		std::string originalText = getText();
@@ -325,6 +363,7 @@ struct SpellbookTextField : LedDisplayTextField {
 		}
 
 		setText(cleanedText);  // This should also trigger the widget to update its display
+		updateSizeAndPosition();  // Update size and position after text update
 	}
 
 	std::string cleanAndPadText(const std::string& originalText) {
@@ -388,37 +427,6 @@ struct SpellbookTextField : LedDisplayTextField {
 	}
 };
 
-struct ScrollingContainer : Widget {
-    float minY = 0.0f, maxY = 0.0f;
-    
-    ScrollingContainer() {
-        this->box.pos = Vec(0, 0);
-    }
-
-    void setScrollLimits(float contentHeight, float viewportHeight) {
-        if (contentHeight > viewportHeight) {
-            minY = viewportHeight - contentHeight;  // Content is taller, allow scrolling up
-            maxY = 0.0f;  // Bottom align when fully scrolled up
-        } else {
-            minY = 0.0f;  // Content is shorter, no need to scroll
-            maxY = 0.0f;  // Keep top aligned
-        }
-    }
-
-    void onHoverScroll(const event::HoverScroll &e) override {
-        Widget::onHoverScroll(e);
-        float delta = e.scrollDelta.y * 0.5f; // Adjust scroll speed if necessary
-        float newY = clamp(box.pos.y + delta, minY, maxY);
-        if (newY != box.pos.y) {
-            box.pos.y = newY;
-            for (Widget* child : children) {
-                child->box.pos.y = newY;
-            }
-        }
-        e.consume(this);
-    }
-};
-
 struct SpellbookWidget : ModuleWidget {
 	SpellbookWidget(Spellbook* module) {
 		setModule(module);
@@ -448,27 +456,25 @@ struct SpellbookWidget : ModuleWidget {
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*10)), module, Spellbook::OUT16_OUTPUT));
 		
 		
-        ScrollingContainer* container = createWidget<ScrollingContainer>(Vec(0, 0));
-        container->box.size = Vec(mm2px(Vec(GRID_SNAP * 19, 128.85)));
-
-        // Text field settings
+        // Main text field for patch notes
         SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*4, 0)));
-        textField->box.size = mm2px(Vec(GRID_SNAP*17, 128.85)); // Start with same height as module
+        textField->box.size = mm2px(Vec(GRID_SNAP*17, 128.5));
         textField->module = module;
-        container->addChild(textField);
+        addChild(textField);
 
+        // Step indicator field
         StepIndicatorField* stepField = createWidget<StepIndicatorField>(mm2px(Vec(GRID_SNAP*2, 0)));
-        stepField->box.size = mm2px(Vec(GRID_SNAP*2, 128.85)); // Start with same height as module
+        stepField->box.size = mm2px(Vec(GRID_SNAP*2, 128.5));
         stepField->module = module;
-        container->addChild(stepField);
+		textField->stepField = stepField; // Give textField a reference to stepField
+        addChild(stepField);
 
-        addChild(container);
-        container->setScrollLimits(mm2px(128.85), RACK_GRID_HEIGHT); // RACK_GRID_HEIGHT = Module height in pixels
-
-        // Populate text field if module is initialized
+        // Ensure text field is populated with current module text
         if (module) {
             textField->setText(module->text);
         }
+		
+		textField->updateSizeAndPosition();
     }
 };
 
