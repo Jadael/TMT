@@ -133,11 +133,6 @@ struct Spellbook : Module {
     }
 
 	// Map to convert note names into semitone offsets relative to C4
-/* 	std::map<std::string, int> noteToSemitone = {
-		{"C#", 1}, {"Db", 1}, {"D#", 3}, {"Eb", 3}, {"F#", 6}, {"Gb", 6}, {"G#", 8},
-		{"Ab", 8}, {"A#", 10}, {"Bb", 10}, {"B", 11}, {"D", 2}, {"G", 7},
-		{"E", 4}, {"F", 5}, {"A", 9}, {"C", 0}
-	}; */
     std::vector<std::pair<std::string, int>> noteToSemitone = {
         {"C#", 1}, {"Db", 1}, {"D#", 3}, {"Eb", 3}, {"F#", 6}, {"Gb", 6}, {"G#", 8},
         {"Ab", 8}, {"A#", 10}, {"Bb", 10}, {"B", 11}, {"D", 2}, {"G", 7},
@@ -145,10 +140,6 @@ struct Spellbook : Module {
     };
 
 	// Converts a note name and octave to a voltage based on Eurorack 1V/oct standard
-/* 	float noteNameToVoltage(const std::string& noteName, int octave) {
-		int semitoneOffsetFromC4 = noteToSemitone.at(noteName) + (octave - 4) * 12;
-		return static_cast<float>(semitoneOffsetFromC4) / 12.0f;
-	} */
 	float noteNameToVoltage(const std::string& noteName, int octave) {
 		for (const auto& notePair : noteToSemitone) {
 			if (notePair.first == noteName) {
@@ -158,23 +149,6 @@ struct Spellbook : Module {
 		}
 		return 0.0f;  // Return 0.0 volts if the noteName is not found (optional: handle this case more gracefully)
 	}
-
-/* 	// Parses pitch from a cell in the format "NoteNameOctave", e.g., "C4"
-	float parsePitch(const std::string& cell) {
-		for (const auto& notePair : noteToSemitone) {
-			const std::string& noteName = notePair.first;
-			if (cell.rfind(noteName, 0) == 0) { // Check if the cell starts with the note name
-				std::string octavePart = cell.substr(noteName.size());
-				int octave = 4;
-				if (tryParseOctave(octavePart, octave)) {
-					return noteNameToVoltage(noteName, octave);
-				} else {
-					return noteNameToVoltage(noteName, octave);
-				} 
-			}
-		}
-		return 0.0f; // Default value if parsing fails
-	} */
 	
 	// Parses pitch from a cell with various formats
 	float parsePitch(const std::string& cell) {
@@ -213,20 +187,6 @@ struct Spellbook : Module {
 		}
 
 		// Parse note name and octave (e.g., "C4")
-/* 		for (const auto& notePair : noteToSemitone) {
-			const std::string& noteName = notePair.first;
-			if (cell.rfind(noteName, 0) == 0) { // Check if the cell starts with the note name
-				std::string octavePart = cell.substr(noteName.size());
-				int octave = 4;  // Default to octave 4 if parsing fails
-				if (tryParseOctave(octavePart, octave)) {
-					return noteNameToVoltage(noteName, octave);
-				} else {
-					return noteNameToVoltage(noteName, 4);
-				}
-			}
-		}
-		 */
-        // Iterate over the sorted note names
         for (const auto& notePair : noteToSemitone) {
             const std::string& noteName = notePair.first;
             if (cell.rfind(noteName, 0) == 0) { // Ensure the cell starts with the note name
@@ -288,9 +248,6 @@ struct Spellbook : Module {
 					} else if (cell == "R") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'R';  // Retrigger signal (0 for 10ms at start of step)
-/* 					} else if (isDecimal(cell)) {
-						stepData[index].voltage = std::stof(cell);
-						stepData[index].type = 'N'; */
 					} else {
 						stepData[index].voltage = parsePitch(cell);
 						stepData[index].type = 'N';
@@ -309,70 +266,68 @@ struct Spellbook : Module {
 		currentStep = currentStep % steps.size();
 	}
 
-    void process(const ProcessArgs& args) override {
-        if (resetTrigger.process(inputs[RESET_INPUT].getVoltage())) {
-            currentStep = 0;
-            triggerTimer.reset();
-            dirty = true;
-        }
+	void process(const ProcessArgs& args) override {
+		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage())) {
+			currentStep = 0;  // Reset the current step index to 0
+			triggerTimer.reset();  // Reset the timer
+			dirty = true;  // Mark the state as needing re-evaluation
+		}
 
-        if (dirty) {
-            parseText();
-            dirty = false;
-        }
+		if (dirty) {
+			parseText();  // Reparse the text into steps
+			dirty = false;
+			if (steps.empty()) return;  // If still empty after parsing, skip processing
+		}
 
-        if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
-            currentStep = (currentStep + 1) % steps.size();
-            triggerTimer.reset();  // Reset timer at new step
-        }
+		if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
+			if (!steps.empty()) {  // Only process clock input if there are steps defined
+				currentStep = (currentStep + 1) % steps.size();
+				triggerTimer.reset();  // Reset timer at new step
+			}
+		}
 
-        outputs[POLY_OUTPUT].setChannels(16);
-        std::vector<StepData>& currentValues = steps.empty() ? lastValues : steps[currentStep];
+		if (steps.empty()) return;  // Ensure not to proceed if there are no steps
 
-        for (int i = 0; i < 16; i++) {
-            StepData& step = currentValues[i];
-            float outputValue = step.voltage;  // Start with the last known voltage
+		outputs[POLY_OUTPUT].setChannels(16);
+		std::vector<StepData>& currentValues = steps[currentStep];
 
-            switch (step.type) {
-                case 'T':  // Trigger
-                    if (triggerTimer.check(args.sampleTime, 0.002f)) {
-                        outputValue = 0.0f;  // Output zero if it's been more than 2ms
-                    } else if (triggerTimer.check(args.sampleTime, 0.001f)) {
-                        outputValue = 10.0f;  // Otherwise, output 10v if it's been at least 1ms
-                    } else {
-                        outputValue = 0.0f;  // Otherwise, output 0v (first 1ms)
-                    }
-                    break;
-                case 'R':  // Retrigger
-                    if (!triggerTimer.check(args.sampleTime, 0.001f)) {
-                        outputValue = 00.0f;  // Keep low for the first 1ms
-                    } else {
-                        outputValue = 10.0f;  // Output 10V thereafter
-                    }
-                    break;
-                case 'N':  // Normal pitch or CV
-                    //if (step.voltage != 0.0f || step.voltage == lastValues[i].voltage) {
-                        outputValue = step.voltage;  // Normal pitch
-                    //}
-                    break;
-                case 'E':  // Empty cells, check to see if we need to end a gate
-                    if (lastValues[i].type == 'X' || lastValues[i].type == 'T' || lastValues[i].type == 'R' ) {
-                        outputValue = 0.0f;  // Zero on empty cells, if last value was a gate or trigger
-                    } else {
-						outputValue = lastValues[i].voltage; // Otherwise continue last voltage
+		for (int i = 0; i < 16; i++) {
+			StepData& step = currentValues[i];
+			float outputValue = step.voltage;  // Start with the last known voltage
+
+			switch (step.type) {
+				case 'T':  // Trigger
+					if (triggerTimer.check(args.sampleTime, 0.002f)) {
+						outputValue = 0.0f;
+					} else if (triggerTimer.check(args.sampleTime, 0.001f)) {
+						outputValue = 10.0f;
+					} else {
+						outputValue = 0.0f;
 					}
-                    break;
-                default:
-                    // If there's no specific type and the cell was empty, keep last voltage (do nothing)
-                    break;  // Leave outputValue as last known voltage if not explicitly set
-            }
+					break;
+				case 'R':  // Retrigger
+					if (!triggerTimer.check(args.sampleTime, 0.001f)) {
+						outputValue = 0.0f;
+					} else {
+						outputValue = 10.0f;
+					}
+					break;
+				case 'N':  // Normal pitch or CV
+					outputValue = step.voltage;
+					break;
+				case 'E':  // Empty cells
+					outputValue = (lastValues[i].type == 'X' || lastValues[i].type == 'T' || lastValues[i].type == 'R') ? 0.0f : lastValues[i].voltage;
+					break;
+				default:
+					break;
+			}
 
-            outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
-            outputs[POLY_OUTPUT].setVoltage(outputValue, i);
-            lastValues[i].voltage = outputValue;  // Update last known values
-            lastValues[i].type = step.type;       // Update last known type
-        }
-    }
+			outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
+			outputs[POLY_OUTPUT].setVoltage(outputValue, i);
+			lastValues[i].voltage = outputValue;
+			lastValues[i].type = step.type;
+		}
+	}
 };
 
 struct StepIndicatorField : LedDisplayTextField {
@@ -415,12 +370,6 @@ struct SpellbookTextField : LedDisplayTextField {
 	StepIndicatorField* stepField;
 	float minY = 0.0f, maxY = 0.0f;
 	const float lineHeight = 12.0f;
-
-/* 	int getTextPosition(math::Vec mousePos) override {
-		return bndTextFieldTextPosition(APP->window->vg, 0, 0, box.size.x, box.size.y, -1, text.c_str(), mousePos.x, mousePos.y);
-		// Replace this function with something better for our purposes with all the weird text manipulation- all this functions needs to do is somehow decide which position in the text string to return as being "under" the mouse cursor, in a way that aligns with the user's expectations as they visually interact with the module.
-		// We know we're using nanoVG to draw, we know the box of the widget, and we know the teftOffset. We should be able to properly request the actual line height and character width in pxiels that we need from somewhere, instead of guessing we like we are now.
-	} */
 
     SpellbookTextField() {
         this->multiline = true;  // Allow multiple lines
