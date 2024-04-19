@@ -336,6 +336,7 @@ struct StepIndicatorField : LedDisplayTextField {
     StepIndicatorField() {
         this->multiline = true;  // Allow multiple lines
         this->color = nvgRGB(255, 215, 0);  // Gold text color
+		this->textOffset = Vec(0,0);
     }
 
     void updateStepText() {
@@ -374,9 +375,49 @@ struct SpellbookTextField : LedDisplayTextField {
     SpellbookTextField() {
         this->multiline = true;  // Allow multiple lines
 		this->color = nvgRGB(255, 215, 0);  // Gold text color
-		//this->box.pos = Vec(0, 0);
-		//this->box.size = Vec(0, RACK_GRID_HEIGHT); // Initial height
+		this->textOffset = Vec(0,0);
     }
+	
+	// The bug with not being to move the text cursor / selection past line 32 does NOT seem to be related to the box, clipBox, NvgScissor, or getTextPosition, included here from Widget::TextField for reference.
+/* 	void drawLayer(const DrawArgs& args, int layer) override {
+		nvgScissor(args.vg, RECT_ARGS(args.clipBox));
+
+		if (layer == 1) {
+			// Text
+			std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
+			if (font && font->handle >= 0) {
+				bndSetFont(font->handle);
+
+				NVGcolor highlightColor = color;
+				highlightColor.a = 0.5;
+				int begin = std::min(cursor, selection);
+				int end = (this == APP->event->selectedWidget) ? std::max(cursor, selection) : -1;
+				bndIconLabelCaret(args.vg,
+					textOffset.x, textOffset.y,
+					box.size.x - textOffset.x, box.size.y - textOffset.y,
+					-1, color, 12, text.c_str(), highlightColor, begin, end);
+
+				bndSetFont(APP->window->uiFont->handle);
+			}
+		}
+
+		Widget::drawLayer(args, layer);
+		nvgResetScissor(args.vg);
+	}
+	
+	int getTextPosition(math::Vec mousePos) override {
+		std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
+		if (!font || !font->handle)
+			return 0;
+
+		bndSetFont(font->handle);
+		int textPos = bndIconLabelTextPosition(APP->window->vg,
+			textOffset.x, textOffset.y,
+			box.size.x + textOffset.x, box.size.y + textOffset.y,
+			-1, 12, text.c_str(), mousePos.x, mousePos.y);
+		bndSetFont(APP->window->uiFont->handle);
+		return textPos;
+	} */
 	
     void setScrollLimits(float contentHeight, float viewportHeight) {
 		maxY = 0.0f;  // Top edge can never move down past 0
@@ -402,7 +443,6 @@ struct SpellbookTextField : LedDisplayTextField {
         e.consume(this);
     }
 	
-	
     void updateSizeAndOffset() {
         std::string text = getText();
         size_t lineCount = std::count(text.begin(), text.end(), '\n') + 1;
@@ -411,7 +451,7 @@ struct SpellbookTextField : LedDisplayTextField {
         textHeight = contentHeight;
 		
 		// Refresh scrolling
-		setScrollLimits(contentHeight, RACK_GRID_HEIGHT);
+		setScrollLimits(contentHeight, box.size.y);
     }
 
 	void onDeselect(const DeselectEvent& e) override {
@@ -519,24 +559,24 @@ struct SpellbookWidget : ModuleWidget {
 		
 		
         // Main text field for patch notes
-        SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*4, 0)));
-        textField->setSize(Vec(mm2px(GRID_SNAP*17), RACK_GRID_HEIGHT));
+        SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*4, GRID_SNAP*0.25)));
+        textField->setSize(Vec(mm2px(GRID_SNAP*17), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
         textField->module = module;
         addChild(textField);
 
         // Step indicator field
-        StepIndicatorField* stepField = createWidget<StepIndicatorField>(Vec(mm2px(GRID_SNAP*2),0));
-        stepField->setSize(Vec(mm2px(GRID_SNAP*2), RACK_GRID_HEIGHT));
+        StepIndicatorField* stepField = createWidget<StepIndicatorField>(mm2px(Vec(GRID_SNAP*2, GRID_SNAP*0.25)));
+        stepField->setSize(Vec(mm2px(GRID_SNAP*2), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
         stepField->module = module;
 		textField->stepField = stepField; // Give textField a reference to stepField
         addChild(stepField);
-
+		
         // Ensure text field is populated with current module text
         if (module) {
             textField->setText(module->text);
+			textField->updateSizeAndOffset();
         }
 		
-		textField->updateSizeAndOffset();
     }
 };
 
