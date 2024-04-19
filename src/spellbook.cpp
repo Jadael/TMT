@@ -12,20 +12,33 @@ struct StepData {
 };
 
 struct Timer {
-    float timeLeft = 0.0f;  // Time left in seconds
+    float timeLeft = 0.0f;  // Time since timer start in seconds
 
-    // Reset to 10 ms
+    // Reset to 1 ms
     void reset() {
-        timeLeft = 0.001f;  // Set timer for 1 ms
+        timeLeft = 0.0f;  // Start timer at 0 on resets
     }
+	
+	void set(float seconds) {
+		timeLeft = seconds;
+	}
 
     // Update the timer and check if the period has expired
-    bool update(float deltaTime) {
-        if (timeLeft > 0.0f) {
-            timeLeft -= deltaTime;
-        }
-        return timeLeft <= 0.0f;
+    void update(float deltaTime) {
+        timeLeft += deltaTime;
     }
+	
+	// Return seconds since timer start
+	float time(float deltaTime) {
+        update(deltaTime);
+		return timeLeft;
+	}
+	
+	// Check whether it's been at least `seconds` since the timer started
+	bool check(float deltaTime, float seconds) {
+		update(deltaTime);
+		return timeLeft >= seconds;
+	}
 };
 
 struct Spellbook : Module {
@@ -184,7 +197,7 @@ struct Spellbook : Module {
 						stepData[index].type = 'G';  // Gate
 					} else if (cell == "T") {
 						stepData[index].voltage = 10.0f;
-						stepData[index].type = 'T';  // 10ms Trigger signal
+						stepData[index].type = 'T';  // 1ms Trigger signal
 					} else if (cell == "R") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'R';  // Retrigger signal (0 for 10ms at start of step)
@@ -235,17 +248,19 @@ struct Spellbook : Module {
 
             switch (step.type) {
                 case 'T':  // Trigger
-                    if (!triggerTimer.update(args.sampleTime)) {
-                        outputValue = 10.0f;  // Keep high for the first 10ms
+                    if (triggerTimer.check(args.sampleTime, 0.002f)) {
+                        outputValue = 0.0f;  // Output zero if it's been more than 2ms
+                    } else if (triggerTimer.check(args.sampleTime, 0.001f)) {
+                        outputValue = 10.0f;  // Otherwise, output 10v if it's been at least 1ms
                     } else {
-                        outputValue = 0.0f;  // Then drop to 0V
+                        outputValue = 0.0f;  // Otherwise, output 0v
                     }
                     break;
                 case 'R':  // Retrigger
-                    if (!triggerTimer.update(args.sampleTime)) {
-                        outputValue = 0.0f;  // Keep low for the first 10ms
+                    if (!triggerTimer.check(args.sampleTime, 0.001f)) {
+                        outputValue = 00.0f;  // Keep low for the first 1ms
                     } else {
-                        outputValue = 10.0f;  // Then rise to 10V
+                        outputValue = 10.0f;  // Output 10V thereafter
                     }
                     break;
                 case 'N':  // Normal pitch or CV
