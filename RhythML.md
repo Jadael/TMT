@@ -16,8 +16,8 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
 
 2. **Gate and Trigger Commands**:
    - `X`: Outputs a gate signal (10 volts) for the entire step, equivalent to writing `10` in the cell.
-   - `T`: Outputs a trigger signal (10 volts) for the first 10ms of the step, then 0 volts for the remainder.
-   - `R`: Outputs 0 volts for the first 10ms of the step, then a gate signal (10 volts) for the remainder.
+   - `T`: Outputs 0v for 1ms, then 10v for 1ms, then 0v thereafter.
+   - `R`: Outputs 0 volts for the first 1ms of the step, then a high signal (10 volts) for the remainder.
    - Gates (and all signals except for Triggers and Retriggers) are 100% step width; two consecutive gates will output a continuous signal.
 
 3. **Scientific Pitch Names**:

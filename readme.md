@@ -169,9 +169,11 @@ E4 ? Pitch, X ? Gate, 10 ? Velocity
 C5        , R       , 8
 D5        , R       , 6
           ,         , 
-B4        , T       , 5
+B4        , X       , 5
           ,         , 
 ```
+
+Notice the way this pattern holds notes by using consecutive gates over several steps, using Retriggers to ensure a new rising edge after a prior gate.
 
 Watch a brief demonstration here:
 
