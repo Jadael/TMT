@@ -133,19 +133,33 @@ struct Spellbook : Module {
     }
 
 	// Map to convert note names into semitone offsets relative to C4
-	std::map<std::string, int> noteToSemitone = {
-		{"C", 0}, {"C#", 1}, {"Db", 1}, {"D", 2}, {"D#", 3}, {"Eb", 3},
-		{"E", 4}, {"F", 5}, {"F#", 6}, {"Gb", 6}, {"G", 7}, {"G#", 8},
-		{"Ab", 8}, {"A", 9}, {"A#", 10}, {"Bb", 10}, {"B", 11}
-	};
+/* 	std::map<std::string, int> noteToSemitone = {
+		{"C#", 1}, {"Db", 1}, {"D#", 3}, {"Eb", 3}, {"F#", 6}, {"Gb", 6}, {"G#", 8},
+		{"Ab", 8}, {"A#", 10}, {"Bb", 10}, {"B", 11}, {"D", 2}, {"G", 7},
+		{"E", 4}, {"F", 5}, {"A", 9}, {"C", 0}
+	}; */
+    std::vector<std::pair<std::string, int>> noteToSemitone = {
+        {"C#", 1}, {"Db", 1}, {"D#", 3}, {"Eb", 3}, {"F#", 6}, {"Gb", 6}, {"G#", 8},
+        {"Ab", 8}, {"A#", 10}, {"Bb", 10}, {"B", 11}, {"D", 2}, {"G", 7},
+        {"E", 4}, {"F", 5}, {"A", 9}, {"C", 0}
+    };
 
 	// Converts a note name and octave to a voltage based on Eurorack 1V/oct standard
-	float noteNameToVoltage(const std::string& noteName, int octave) {
+/* 	float noteNameToVoltage(const std::string& noteName, int octave) {
 		int semitoneOffsetFromC4 = noteToSemitone.at(noteName) + (octave - 4) * 12;
 		return static_cast<float>(semitoneOffsetFromC4) / 12.0f;
+	} */
+	float noteNameToVoltage(const std::string& noteName, int octave) {
+		for (const auto& notePair : noteToSemitone) {
+			if (notePair.first == noteName) {
+				int semitoneOffsetFromC4 = notePair.second + (octave - 4) * 12;
+				return static_cast<float>(semitoneOffsetFromC4) / 12.0f;
+			}
+		}
+		return 0.0f;  // Return 0.0 volts if the noteName is not found (optional: handle this case more gracefully)
 	}
 
-	// Parses pitch from a cell in the format "NoteNameOctave", e.g., "C4"
+/* 	// Parses pitch from a cell in the format "NoteNameOctave", e.g., "C4"
 	float parsePitch(const std::string& cell) {
 		for (const auto& notePair : noteToSemitone) {
 			const std::string& noteName = notePair.first;
@@ -160,7 +174,80 @@ struct Spellbook : Module {
 			}
 		}
 		return 0.0f; // Default value if parsing fails
+	} */
+	
+	// Parses pitch from a cell with various formats
+	float parsePitch(const std::string& cell) {
+		if (cell.empty()) {
+			return 0.0f;  // Return default voltage for empty cells
+		}
+
+		// Handling for semitone offset input (e.g., "S7" should be interpreted as 7 semitones above C4)
+		if (cell[0] == 'S') {
+			try {
+				float semitoneOffset = std::stof(cell.substr(1));
+				return semitoneOffset / 12.0f;  // Convert semitone offset to voltage
+			} catch (...) {
+				return 0.0f;  // Return default voltage if parsing fails
+			}
+		}
+
+		// Handling for MIDI note number input (e.g., "M60" is MIDI note number 60, equivalent to C4)
+		if (cell[0] == 'M') {
+			try {
+				float midiNoteNumber = std::stof(cell.substr(1));
+				return (midiNoteNumber - 60) / 12.0f;  // Convert MIDI note number to voltage, offset by C4 (MIDI 60)
+			} catch (...) {
+				return 0.0f;  // Return default voltage if parsing fails
+			}
+		}
+
+		// Handling for percentage-based input (e.g., "100%" should convert to 10.0 volts)
+		if (cell.back() == '%') {
+			try {
+				float percentage = std::stof(cell.substr(0, cell.size() - 1));
+				return percentage / 10.0f;  // Convert percentage to voltage
+			} catch (...) {
+				return 0.0f;  // Return default voltage if parsing fails
+			}
+		}
+
+		// Parse note name and octave (e.g., "C4")
+/* 		for (const auto& notePair : noteToSemitone) {
+			const std::string& noteName = notePair.first;
+			if (cell.rfind(noteName, 0) == 0) { // Check if the cell starts with the note name
+				std::string octavePart = cell.substr(noteName.size());
+				int octave = 4;  // Default to octave 4 if parsing fails
+				if (tryParseOctave(octavePart, octave)) {
+					return noteNameToVoltage(noteName, octave);
+				} else {
+					return noteNameToVoltage(noteName, 4);
+				}
+			}
+		}
+		 */
+        // Iterate over the sorted note names
+        for (const auto& notePair : noteToSemitone) {
+            const std::string& noteName = notePair.first;
+            if (cell.rfind(noteName, 0) == 0) { // Ensure the cell starts with the note name
+                std::string octavePart = cell.substr(noteName.length());
+                int octave = 4; // Default octave
+                if (tryParseOctave(octavePart, octave)) {
+                    return noteNameToVoltage(noteName, octave);
+                } else {
+                    return noteNameToVoltage(noteName, 4); // Fallback if octave parsing fails
+                }
+            }
+        }
+
+		// If no format is matched, assume it's a decimal voltage value directly
+		if (isDecimal(cell)) {
+			return std::stof(cell);
+		}
+
+		return 0.0f;  // Default value if no format matches and parsing fails
 	}
+	
 
     // Attempts to parse a string to an integer, safely handling exceptions
     bool tryParseOctave(const std::string& text, int& octaveOut) {
@@ -201,9 +288,9 @@ struct Spellbook : Module {
 					} else if (cell == "R") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'R';  // Retrigger signal (0 for 10ms at start of step)
-					} else if (isDecimal(cell)) {
+/* 					} else if (isDecimal(cell)) {
 						stepData[index].voltage = std::stof(cell);
-						stepData[index].type = 'N';
+						stepData[index].type = 'N'; */
 					} else {
 						stepData[index].voltage = parsePitch(cell);
 						stepData[index].type = 'N';
@@ -253,7 +340,7 @@ struct Spellbook : Module {
                     } else if (triggerTimer.check(args.sampleTime, 0.001f)) {
                         outputValue = 10.0f;  // Otherwise, output 10v if it's been at least 1ms
                     } else {
-                        outputValue = 0.0f;  // Otherwise, output 0v
+                        outputValue = 0.0f;  // Otherwise, output 0v (first 1ms)
                     }
                     break;
                 case 'R':  // Retrigger
@@ -269,7 +356,7 @@ struct Spellbook : Module {
                     //}
                     break;
                 case 'E':  // Empty cells, check to see if we need to end a gate
-                    if (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R' ) {
+                    if (lastValues[i].type == 'X' || lastValues[i].type == 'T' || lastValues[i].type == 'R' ) {
                         outputValue = 0.0f;  // Zero on empty cells, if last value was a gate or trigger
                     } else {
 						outputValue = lastValues[i].voltage; // Otherwise continue last voltage
