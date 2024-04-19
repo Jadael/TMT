@@ -309,50 +309,58 @@ struct StepIndicatorField : LedDisplayTextField {
 
 struct SpellbookTextField : LedDisplayTextField {
     Spellbook* module;
+	float textHeight;
 	StepIndicatorField* stepField;
 	float minY = 0.0f, maxY = 0.0f;
 	const float lineHeight = 12.0f;
 
+/* 	int getTextPosition(math::Vec mousePos) override {
+		return bndTextFieldTextPosition(APP->window->vg, 0, 0, box.size.x, box.size.y, -1, text.c_str(), mousePos.x, mousePos.y);
+		// Replace this function with something better for our purposes with all the weird text manipulation- all this functions needs to do is somehow decide which position in the text string to return as being "under" the mouse cursor, in a way that aligns with the user's expectations as they visually interact with the module.
+		// We know we're using nanoVG to draw, we know the box of the widget, and we know the teftOffset. We should be able to properly request the actual line height and character width in pxiels that we need from somewhere, instead of guessing we like we are now.
+	} */
+
     SpellbookTextField() {
         this->multiline = true;  // Allow multiple lines
-		this->box.pos = Vec(0, 0);
-		this->box.size = Vec(0, RACK_GRID_HEIGHT); // Initial height
+		this->color = nvgRGB(255, 215, 0);  // Gold text color
+		//this->box.pos = Vec(0, 0);
+		//this->box.size = Vec(0, RACK_GRID_HEIGHT); // Initial height
     }
 	
     void setScrollLimits(float contentHeight, float viewportHeight) {
+		maxY = 0.0f;  // Top edge can never move down past 0
         if (contentHeight > viewportHeight) {
             minY = viewportHeight - contentHeight;  // Content is taller, allow scrolling up
-            maxY = 0.0f;  // Bottom align when fully scrolled up
         } else {
             minY = 0.0f;  // Content is shorter, no need to scroll
-            maxY = 0.0f;  // Keep top aligned
         }
     }
-
+	
     void onHoverScroll(const event::HoverScroll &e) override {
         Widget::onHoverScroll(e);
         float delta = e.scrollDelta.y * 1.0f; // Adjust scroll speed if necessary
-        float newY = clamp(box.pos.y + delta, minY, maxY);
-		box.pos.y = newY;
-		stepField->box.pos.y = newY;
+        float newY = clamp(textOffset.y + delta, minY, maxY);
+		// Offset the text
+		//box.pos.y = newY;
+		textOffset.y = newY;
+		// Offset stepField to match
+		if (stepField) {
+			//stepField->box.pos.y = newY;
+			stepField->textOffset.y = newY;
+		}
         e.consume(this);
     }
 	
-    void updateSizeAndPosition() {
+	
+    void updateSizeAndOffset() {
         std::string text = getText();
         size_t lineCount = std::count(text.begin(), text.end(), '\n') + 1;
         float contentHeight = lineCount * lineHeight;
         
-        float newHeight = std::max(contentHeight, static_cast<float>(RACK_GRID_HEIGHT));
+        textHeight = contentHeight;
 		
-		// Resize the widget
-        setScrollLimits(contentHeight, RACK_GRID_HEIGHT);
-		setSize(Vec(box.size.x, newHeight));
-
-        // Resize stepField to match
-        if (stepField) {
-            stepField->box.size.y = newHeight;
-        }
+		// Refresh scrolling
+		setScrollLimits(contentHeight, RACK_GRID_HEIGHT);
     }
 
 	void onDeselect(const DeselectEvent& e) override {
@@ -365,7 +373,8 @@ struct SpellbookTextField : LedDisplayTextField {
 		}
 
 		setText(cleanedText);  // This should also trigger the widget to update its display
-		updateSizeAndPosition();  // Update size and position after text update
+		updateSizeAndOffset();
+		//updateSizeAndPosition();  // Update size and position after text update
 	}
 
 	std::string cleanAndPadText(const std::string& originalText) {
@@ -460,13 +469,13 @@ struct SpellbookWidget : ModuleWidget {
 		
         // Main text field for patch notes
         SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*4, 0)));
-        textField->box.size = mm2px(Vec(GRID_SNAP*17, 128.5));
+        textField->setSize(Vec(mm2px(GRID_SNAP*17), RACK_GRID_HEIGHT));
         textField->module = module;
         addChild(textField);
 
         // Step indicator field
-        StepIndicatorField* stepField = createWidget<StepIndicatorField>(mm2px(Vec(GRID_SNAP*2, 0)));
-        stepField->box.size = mm2px(Vec(GRID_SNAP*2, 128.5));
+        StepIndicatorField* stepField = createWidget<StepIndicatorField>(Vec(mm2px(GRID_SNAP*2),0));
+        stepField->setSize(Vec(mm2px(GRID_SNAP*2), RACK_GRID_HEIGHT));
         stepField->module = module;
 		textField->stepField = stepField; // Give textField a reference to stepField
         addChild(stepField);
@@ -476,7 +485,7 @@ struct SpellbookWidget : ModuleWidget {
             textField->setText(module->text);
         }
 		
-		textField->updateSizeAndPosition();
+		textField->updateSizeAndOffset();
     }
 };
 
