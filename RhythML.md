@@ -15,9 +15,14 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
    - Anything that parses to a floating point number is allowed, but note Eurorack convention is to stay within -10 to +10 volts, with a 10 volt range between min and max value, and some modules may not accept unexpected numbers.
 
 2. **Gate and Trigger Commands**:
-   - `X`: Outputs a gate signal (10 volts) for the entire step, equivalent to writing `10` in the cell.
    - `T`: Outputs 0v for 1ms, then 10v for 1ms, then 0v thereafter.
+      - This guarantees a rising edge, regardless of the prior step, but does not hold a high signal afterward.
    - `R`: Outputs 0 volts for the first 1ms of the step, then a high signal (10 volts) for the remainder.
+      - You'll ususally use this to start a held note.
+	  - This guarantees a rising edge, regardless of the prior step, and holds a high signal afterward.
+   - `X`: Outputs a full width gate signal (10 volts), equivalent to writing `10` in the cell.
+      - You'll usually use this to continue a held note.
+      - If the output is already high from a prior retrigger or gate, this will NOT trigger a new rising edge in the signal.
    - Gates (and all signals except for Triggers and Retriggers) are 100% step width; two consecutive gates will output a continuous signal.
 
 3. **Scientific Pitch Names**:
@@ -51,13 +56,13 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
 Note that unlike MIDI or a Tracker, a single cell with a pitch in it does not automatically generate anything like a gate or a "note on", it just outputs one voltage to one output, like a Eurorack sequencer. You would need to sequence the rhythm using voltages/gates/triggers/retriggers in another column, or get rhythm from another source like your clock. Remember, any column can be for used for anything you need a voltage for: pitches, gates, velocity, CVs, etc. Think modular!
 
 ### Comments
-- Any text following a `?` in a cell is considered a comment (until the next `,` (thus comments CANNOT contain `,`)) and is ignored during parsing.
+- Any text following a `?` in a cell is considered a comment (until the next `,`) and is ignored during parsing. Comments cannot contain commas.
 
 Example:
 
 `5.0 ? This is a comment, 5.5 ? You can put a comment in any cell`
 
-Consider using comments in the first row to label your columns:
+Consider using comments as labels:
 
 ```
 E4 ? Pitch, X ? Gate, 10 ? Velocity
@@ -69,12 +74,44 @@ B4        ,         , 5
 Or to explain musical intentions:
 
 ```
-7 ? Melody volume, 5 ? Backing volume, 0 ? Drum chance, 0.0 ? Reverb, 3.5 ? Filter Cutoff, ? Notes; Soft start; no drums; slight reverb; mild filter
-7                , 5                 , 0              , 0.0         , 3.5                , ? Continue soft intro
-8                , 6                 , 3              , 0.5         , 4.0                , ? Increase all volumes; introduce drums softly
+70% ? Melody volume, 50% ? Backing volume, 0% ? Drum chance,  0% ? Reverb, 35% ? Filter, ? NOTES - Soft start - no drums - slight reverb - mild filter
+70%                , 50%                 , 0%              ,  0%         , 35%         , ? Continue soft intro
+80%                , 60%                 , 30%             , 50%         , 40%         , ? Increase all volumes - introduce drums sporadically
 ```
 
 ### Whitespace
 - Whitespace in cell values is ignored.
 - Cells are normalized during editing such that each cell in a column has uniform spacing padded with spaces to align columns vertically for readability.
 	- Blank lines are NOT ignored, and will become new blank rows, with commas added automatically.
+
+### Usage Example
+
+Here's a simple RhythML sequence to get started:
+
+```
+E4 ? Pitch, R ? Gate, 10 ? Velocity
+C5        , T       , 8
+D5        , T       , 6
+B4        , T       , 5
+```
+
+In this example, each step sets a pitch in column 1, uses column 2 for gating, and controls a velocity CV in column 3. The sequence plays a C major arpeggio, holding the first note for a full beat, and gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored because of the `?`.
+
+Here's the same arpeggio, but with a little more rhythmic variation across 8 steps instead of 4, which you could play at a faster clock speed:
+
+```
+E4 ? Pitch, R ? Gate, 10 ? Velocity
+          , X       , 
+          , X       , 
+C5        , R       , 8
+D5        , R       , 6
+          ,         , 
+B4        , R       , 5
+          ,         , 
+```
+
+Notice the way this pattern holds notes by using consecutive gates over several steps, using retriggers to ensure a new rising edge for each new pitch.
+
+Watch a brief demonstration here:
+
+[![YouTube Demo](https://img.youtube.com/vi/vhQHPlpJW-Q/0.jpg)](https://www.youtube.com/watch?v=vhQHPlpJW-Q)
