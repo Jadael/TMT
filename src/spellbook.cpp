@@ -330,91 +330,6 @@ struct Spellbook : Module {
 	}
 };
 
-/* struct StepIndicatorField : LedDisplayTextField {
-    Spellbook* module;
-
-    StepIndicatorField() {
-        this->multiline = true;  // Allow multiple lines
-        this->color = nvgRGB(255, 215, 0);  // Gold text color
-		this->textOffset = Vec(0,0);
-    }
-	
-	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer != 1) return;  // Only draw on the correct layer
-
-		nvgScissor(args.vg, RECT_ARGS(args.clipBox));  // Apply clipping based on the current widget bounds
-
-		// Configure font
-		std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
-		if (!font) return;
-		nvgFontFaceId(args.vg, font->handle);
-		nvgFontSize(args.vg, 12);  // Example font size
-		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-
-		// Brute force a 12px by 6px grid.
-		float lineHeight = 12;
-		float charWidth = 6;
-
-		// Variables for text drawing
-		float x = textOffset.x;  // Horizontal text start - typically a small indent
-		float y = textOffset.y;  // Vertical scroll offset
-		std::string text = getText();
-		std::istringstream lines(text);
-		std::string line;
-		int currentPos = 0;  // Current character position in the overall text
-
-		// Draw each line of text
-		while (std::getline(lines, line)) {
-			if (y + lineHeight < 0) {
-				y += lineHeight;
-				currentPos += line.size() + 1;
-				continue;
-			}
-			if (y > args.clipBox.size.y) break;
-
-			for (size_t i = 0; i < line.length(); ++i) {
-				float charX = x + i * charWidth;  // X position of the character
-
-				// Draw the character
-				char str[2] = {line[i], 0};  // Temporary string for character
-				nvgFillColor(args.vg, nvgRGB(255, 215, 0));  // Text color
-				nvgText(args.vg, charX, y, str, NULL);
-			}
-
-
-			y += lineHeight;
-			currentPos += line.length() + 1;
-		}
-
-		nvgResetScissor(args.vg);
-	}
-
-    void updateStepText() {
-        if (!module) return;
-
-        int totalSteps = module->steps.size();
-        int maxDigits = std::to_string(totalSteps).length();  // Maximum digits in the largest step number
-
-        std::ostringstream oss;
-        for (int i = 0; i < totalSteps; i++) {
-            std::string stepNumber = std::to_string(i + 1);  // Convert step number to string
-            std::string paddedStepNumber = std::string(maxDigits - stepNumber.length(), ' ') + stepNumber;  // Pad with spaces
-
-            if (i == module->currentStep) {
-                oss << ">" << paddedStepNumber << "|\n";  // Mark the current step
-            } else {
-                oss << " " << paddedStepNumber << "|\n";
-            }
-        }
-        this->setText(oss.str());
-    }
-
-    void step() override {
-        Widget::step();
-        updateStepText();  // Update the step numbers every frame
-    }
-}; */
-
 struct SpellbookTextField : LedDisplayTextField {
     Spellbook* module;
     float textHeight;
@@ -491,7 +406,7 @@ struct SpellbookTextField : LedDisplayTextField {
 			if (cursor >= currentPos && cursor < currentPos + (int)line.length() + 1 && cursor == selection) {
 				float cursorX = x + (cursor - currentPos) * charWidth;
 				nvgBeginPath(args.vg);
-				nvgFillColor(args.vg, nvgRGB(121, 8, 170));  // Cursor color
+				nvgFillColor(args.vg, nvgRGB(158, 80, 191));  // Cursor color
 				nvgRect(args.vg, cursorX, y, 1, lineHeight);
 				nvgFill(args.vg);
 			}
@@ -499,11 +414,11 @@ struct SpellbookTextField : LedDisplayTextField {
 			// Draw step numbers in the gutter
 			std::string stepNumber = std::to_string(lineIndex + 1) + "| ";
 			if (module->currentStep == lineIndex) {
-				stepNumber = "------------|"+ stepNumber;
+				stepNumber = "@> "+ stepNumber;
 			}
 			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL);
 			float stepX = -(GRID_SNAP * 5) + (GRID_SNAP * 5 - stepTextWidth);  // Right-align in gutter
-			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(121, 8, 170) : nvgRGB(255, 215, 0));  // Current step in purple, others in gold
+			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(158, 80, 191) : nvgRGB(155, 131, 0));  // Current step in purple, others in gold
 			nvgText(args.vg, stepX, y, stepNumber.c_str(), NULL);
 
 			y += lineHeight;
