@@ -338,6 +338,61 @@ struct StepIndicatorField : LedDisplayTextField {
         this->color = nvgRGB(255, 215, 0);  // Gold text color
 		this->textOffset = Vec(0,0);
     }
+	
+	void drawLayer(const DrawArgs& args, int layer) override {
+		if (layer != 1) return;  // Only draw on the correct layer
+
+		nvgScissor(args.vg, RECT_ARGS(args.clipBox));  // Apply clipping based on the current widget bounds
+
+		// Configure font
+		std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
+		if (!font) return;
+		nvgFontFaceId(args.vg, font->handle);
+		nvgFontSize(args.vg, 12);  // Example font size
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+
+		// Fetch text metrics
+		float lineHeight = 0;
+		float charWidth = nvgTextBounds(args.vg, 0, 0, "W", NULL, NULL);  // Width of one monospaced character (assuming `W` is representative)
+		nvgTextMetrics(args.vg, NULL, NULL, &lineHeight);
+		
+		// Forget all that, let's brute force a 12px by 6px grid.
+		lineHeight = 12;
+		charWidth = 6;
+
+		// Variables for text drawing
+		float x = textOffset.x;  // Horizontal text start - typically a small indent
+		float y = textOffset.y;  // Vertical scroll offset
+		std::string text = getText();
+		std::istringstream lines(text);
+		std::string line;
+		int currentPos = 0;  // Current character position in the overall text
+
+		// Draw each line of text
+		while (std::getline(lines, line)) {
+			if (y + lineHeight < 0) {
+				y += lineHeight;
+				currentPos += line.size() + 1;
+				continue;
+			}
+			if (y > args.clipBox.size.y) break;
+
+			for (size_t i = 0; i < line.length(); ++i) {
+				float charX = x + i * charWidth;  // X position of the character
+
+				// Draw the character
+				char str[2] = {line[i], 0};  // Temporary string for character
+				nvgFillColor(args.vg, nvgRGB(255, 215, 0));  // Text color
+				nvgText(args.vg, charX, y, str, NULL);
+			}
+
+
+			y += lineHeight;
+			currentPos += line.length() + 1;
+		}
+
+		nvgResetScissor(args.vg);
+	}
 
     void updateStepText() {
         if (!module) return;
@@ -367,57 +422,132 @@ struct StepIndicatorField : LedDisplayTextField {
 
 struct SpellbookTextField : LedDisplayTextField {
     Spellbook* module;
-	float textHeight;
-	StepIndicatorField* stepField;
-	float minY = 0.0f, maxY = 0.0f;
-	const float lineHeight = 12.0f;
+    float textHeight;
+    StepIndicatorField* stepField;
+    float minY = 0.0f, maxY = 0.0f;
+    const float lineHeight = 12.0f;
+    math::Vec mousePos;  // To track the mouse position within the widget
+    int lastTextPosition = 0; // To store the last calculated text position for display in the debug info
+    float lastMouseX = 0.0f, lastMouseY = 0.0f; // To store the exact mouse coordinates passed to the text positioning function
 
     SpellbookTextField() {
-        this->multiline = true;  // Allow multiple lines
-		this->color = nvgRGB(255, 215, 0);  // Gold text color
-		this->textOffset = Vec(0,0);
+        this->multiline = true;
+        this->color = nvgRGB(255, 215, 0);  // Gold text color
+        this->textOffset = Vec(0,0);
     }
 	
-	// The bug with not being to move the text cursor / selection past line 32 does NOT seem to be related to the box, clipBox, NvgScissor, or getTextPosition, included here from Widget::TextField for reference.
-/* 	void drawLayer(const DrawArgs& args, int layer) override {
-		nvgScissor(args.vg, RECT_ARGS(args.clipBox));
+	void drawLayer(const DrawArgs& args, int layer) override {
+		if (layer != 1) return;  // Only draw on the correct layer
 
-		if (layer == 1) {
-			// Text
-			std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
-			if (font && font->handle >= 0) {
-				bndSetFont(font->handle);
+		nvgScissor(args.vg, RECT_ARGS(args.clipBox));  // Apply clipping based on the current widget bounds
 
-				NVGcolor highlightColor = color;
-				highlightColor.a = 0.5;
-				int begin = std::min(cursor, selection);
-				int end = (this == APP->event->selectedWidget) ? std::max(cursor, selection) : -1;
-				bndIconLabelCaret(args.vg,
-					textOffset.x, textOffset.y,
-					box.size.x - textOffset.x, box.size.y - textOffset.y,
-					-1, color, 12, text.c_str(), highlightColor, begin, end);
+		// Configure font
+		std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
+		if (!font) return;
+		nvgFontFaceId(args.vg, font->handle);
+		nvgFontSize(args.vg, 12);  // Example font size
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
 
-				bndSetFont(APP->window->uiFont->handle);
+		// Fetch text metrics
+		float lineHeight = 0;
+		float charWidth = nvgTextBounds(args.vg, 0, 0, "W", NULL, NULL);  // Width of one monospaced character (assuming `W` is representative)
+		nvgTextMetrics(args.vg, NULL, NULL, &lineHeight);
+		
+		// Forget all that, let's brute force a 12px by 6px grid.
+		lineHeight = 12;
+		charWidth = 6;
+
+		// Variables for text drawing
+		float x = textOffset.x;  // Horizontal text start - typically a small indent
+		float y = textOffset.y;  // Vertical scroll offset
+		std::string text = getText();
+		std::istringstream lines(text);
+		std::string line;
+		int currentPos = 0;  // Current character position in the overall text
+		int selectionStart = std::min(cursor, selection);
+		int selectionEnd = std::max(cursor, selection);
+
+		// Draw each line of text
+		while (std::getline(lines, line)) {
+			if (y + lineHeight < 0) {
+				y += lineHeight;
+				currentPos += line.size() + 1;
+				continue;
 			}
+			if (y > args.clipBox.size.y) break;
+
+			for (size_t i = 0; i < line.length(); ++i) {
+				float charX = x + i * charWidth;  // X position of the character
+
+				// Draw selection background for this character if within selection bounds
+				if (currentPos + i >= selectionStart && currentPos + i < selectionEnd) {
+					nvgBeginPath(args.vg);
+					nvgFillColor(args.vg, nvgRGBA(73, 3, 103, 200));  // Selection color
+					nvgRect(args.vg, charX, y, charWidth, lineHeight);
+					nvgFill(args.vg);
+				}
+
+				// Draw the character
+				char str[2] = {line[i], 0};  // Temporary string for character
+				nvgFillColor(args.vg, nvgRGB(255, 215, 0));  // Text color
+				nvgText(args.vg, charX, y, str, NULL);
+			}
+
+			// Draw cursor if within this line
+			if (cursor >= currentPos && cursor < currentPos + (int)line.length() + 1 && cursor == selection) {
+				float cursorX = x + (cursor - currentPos) * charWidth;
+				nvgBeginPath(args.vg);
+				nvgFillColor(args.vg, nvgRGB(121, 8, 170));  // Cursor color
+				nvgRect(args.vg, cursorX, y, 1, lineHeight);
+				nvgFill(args.vg);
+			}
+
+			y += lineHeight;
+			currentPos += line.length() + 1;
 		}
 
-		Widget::drawLayer(args, layer);
 		nvgResetScissor(args.vg);
 	}
-	
+
 	int getTextPosition(math::Vec mousePos) override {
 		std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
-		if (!font || !font->handle)
+		if (!font || font->handle == -1)
 			return 0;
 
-		bndSetFont(font->handle);
-		int textPos = bndIconLabelTextPosition(APP->window->vg,
-			textOffset.x, textOffset.y,
-			box.size.x + textOffset.x, box.size.y + textOffset.y,
-			-1, 12, text.c_str(), mousePos.x, mousePos.y);
-		bndSetFont(APP->window->uiFont->handle);
-		return textPos;
-	} */
+		nvgFontFaceId(APP->window->vg, font->handle);
+		nvgFontSize(APP->window->vg, 12);
+		nvgTextAlign(APP->window->vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+
+		float lineHeight = 0;
+		float charWidth = nvgTextBounds(APP->window->vg, 0, 0, "W", NULL, NULL);  // Width of one monospaced character
+		nvgTextMetrics(APP->window->vg, NULL, NULL, &lineHeight);
+		
+		// Forget all that, let's brute force a 12px by 6px grid.
+		lineHeight = 12;
+		charWidth = 6;
+
+		mousePos.x -= textOffset.x;
+		mousePos.y -= textOffset.y;
+
+		std::string text = getText();
+		std::istringstream lines(text);
+		std::string line;
+		int textPosition = 0;
+		float y = 0;
+
+		while (std::getline(lines, line)) {
+			if (mousePos.y < y) break;
+			if (mousePos.y <= y + lineHeight) {
+				int charIndex = (int)((mousePos.x) / charWidth);  // Calculate character index from x position
+				charIndex = std::min(charIndex, (int)line.length());  // Clamp within line length
+				return textPosition + charIndex;
+			}
+			y += lineHeight;
+			textPosition += line.length() + 1;
+		}
+
+		return textPosition;
+	}
 	
     void setScrollLimits(float contentHeight, float viewportHeight) {
 		maxY = 0.0f;  // Top edge can never move down past 0
