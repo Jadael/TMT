@@ -59,6 +59,7 @@ struct SightScope : LightWidget {
         // Advance Voltage buffer one sample
         advanceBuffer(module->inputs[Sight::VOLTAGE_INPUT].getVoltage());
 		
+		nvgScissor(args.vg, RECT_ARGS(args.clipBox));
 		// Draw dotted lines at 1 volt increments
 		nvgStrokeColor(args.vg, nvgRGBA(0, 0, 0, 128));
 		nvgStrokeWidth(args.vg, 1);
@@ -93,6 +94,7 @@ struct SightScope : LightWidget {
         nvgStrokeWidth(args.vg, 1);
         nvgStroke(args.vg);
         nvgClosePath(args.vg);
+		nvgResetScissor(args.vg);
     }
 };
 
