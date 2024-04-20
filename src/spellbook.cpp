@@ -428,7 +428,7 @@ struct SpellbookTextField : LedDisplayTextField {
 
 		nvgResetScissor(args.vg);
 	}
-
+	
 	int getTextPosition(math::Vec mousePos) override {
 		std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
 		if (!font || font->handle == -1)
@@ -481,11 +481,6 @@ struct SpellbookTextField : LedDisplayTextField {
 		// Offset the text
 		//box.pos.y = newY;
 		textOffset.y = newY;
-		// Offset stepField to match
-/* 		if (stepField) {
-			//stepField->box.pos.y = newY;
-			stepField->textOffset.y = newY;
-		} */
         e.consume(this);
     }
 	
@@ -573,6 +568,59 @@ struct SpellbookTextField : LedDisplayTextField {
 
 		return cleanedText;
 	}
+	
+	// Construction zone --
+	
+    void onSelectKey(const SelectKeyEvent& e) override {
+        if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
+            if (e.key == GLFW_KEY_UP || e.key == GLFW_KEY_DOWN) {
+                std::string text = getText();
+                std::vector<int> lineBreaks = {-1};  // Start before first line
+                for (int i = 0; i < (int)text.length(); i++) {
+                    if (text[i] == '\n') lineBreaks.push_back(i);
+                }
+                lineBreaks.push_back(text.length());  // End after last line
+
+                int currentLine = 0;
+                while (currentLine < (int)lineBreaks.size() - 1 && lineBreaks[currentLine + 1] < cursor) {
+                    currentLine++;
+                }
+
+                int lineStart = lineBreaks[currentLine] + 1;
+                int lineEnd = lineBreaks[currentLine + 1];
+                int posInLine = cursor - lineStart;
+
+                if (e.key == GLFW_KEY_UP && currentLine > 0) {
+                    int prevLineStart = lineBreaks[currentLine - 1] + 1;
+                    int prevLineEnd = lineBreaks[currentLine];
+                    cursor = std::min(prevLineStart + posInLine, prevLineEnd);
+                } else if (e.key == GLFW_KEY_DOWN && currentLine < (int)lineBreaks.size() - 2) {
+                    int nextLineStart = lineBreaks[currentLine + 1] + 1;
+                    int nextLineEnd = lineBreaks[currentLine + 2];
+                    cursor = std::min(nextLineStart + posInLine, nextLineEnd);
+                }
+
+                if (!(e.mods & GLFW_MOD_SHIFT)) {
+                    selection = cursor;
+                }
+                e.consume(this);
+                return;
+            }
+        }
+        LedDisplayTextField::onSelectKey(e);
+    }
+
+    std::vector<std::string> split(const std::string &s, char delim) {
+        std::vector<std::string> elems;
+        std::stringstream ss(s);
+        std::string item;
+        while (std::getline(ss, item, delim)) {
+            elems.push_back(item);
+        }
+        return elems;
+    }
+	
+	// -- Construction zone
 };
 
 struct SpellbookWidget : ModuleWidget {
@@ -605,8 +653,8 @@ struct SpellbookWidget : ModuleWidget {
 		
 		
         // Main text field for patch notes
-        SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*4, GRID_SNAP*0.25)));
-        textField->setSize(Vec(mm2px(GRID_SNAP*17), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
+        SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*3, GRID_SNAP*0.25)));
+        textField->setSize(Vec(mm2px(GRID_SNAP*18), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
         textField->module = module;
         addChild(textField);
 
