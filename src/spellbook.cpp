@@ -330,7 +330,7 @@ struct Spellbook : Module {
 	}
 };
 
-struct StepIndicatorField : LedDisplayTextField {
+/* struct StepIndicatorField : LedDisplayTextField {
     Spellbook* module;
 
     StepIndicatorField() {
@@ -351,14 +351,9 @@ struct StepIndicatorField : LedDisplayTextField {
 		nvgFontSize(args.vg, 12);  // Example font size
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
 
-		// Fetch text metrics
-		float lineHeight = 0;
-		float charWidth = nvgTextBounds(args.vg, 0, 0, "W", NULL, NULL);  // Width of one monospaced character (assuming `W` is representative)
-		nvgTextMetrics(args.vg, NULL, NULL, &lineHeight);
-		
-		// Forget all that, let's brute force a 12px by 6px grid.
-		lineHeight = 12;
-		charWidth = 6;
+		// Brute force a 12px by 6px grid.
+		float lineHeight = 12;
+		float charWidth = 6;
 
 		// Variables for text drawing
 		float x = textOffset.x;  // Horizontal text start - typically a small indent
@@ -418,12 +413,12 @@ struct StepIndicatorField : LedDisplayTextField {
         Widget::step();
         updateStepText();  // Update the step numbers every frame
     }
-};
+}; */
 
 struct SpellbookTextField : LedDisplayTextField {
     Spellbook* module;
     float textHeight;
-    StepIndicatorField* stepField;
+    //StepIndicatorField* stepField;
     float minY = 0.0f, maxY = 0.0f;
     const float lineHeight = 12.0f;
     math::Vec mousePos;  // To track the mouse position within the widget
@@ -431,7 +426,6 @@ struct SpellbookTextField : LedDisplayTextField {
     float lastMouseX = 0.0f, lastMouseY = 0.0f; // To store the exact mouse coordinates passed to the text positioning function
 
     SpellbookTextField() {
-        this->multiline = true;
         this->color = nvgRGB(255, 215, 0);  // Gold text color
         this->textOffset = Vec(0,0);
     }
@@ -439,7 +433,9 @@ struct SpellbookTextField : LedDisplayTextField {
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1) return;  // Only draw on the correct layer
 
-		nvgScissor(args.vg, RECT_ARGS(args.clipBox));  // Apply clipping based on the current widget bounds
+		// Extend the scissor box to include the gutter area
+		nvgScissor(args.vg, args.clipBox.pos.x - GRID_SNAP * 5, args.clipBox.pos.y, 
+				   args.clipBox.size.x + GRID_SNAP * 5, args.clipBox.size.y);
 
 		// Configure font
 		std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
@@ -448,14 +444,9 @@ struct SpellbookTextField : LedDisplayTextField {
 		nvgFontSize(args.vg, 12);  // Example font size
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
 
-		// Fetch text metrics
-		float lineHeight = 0;
-		float charWidth = nvgTextBounds(args.vg, 0, 0, "W", NULL, NULL);  // Width of one monospaced character (assuming `W` is representative)
-		nvgTextMetrics(args.vg, NULL, NULL, &lineHeight);
-		
-		// Forget all that, let's brute force a 12px by 6px grid.
-		lineHeight = 12;
-		charWidth = 6;
+		// Brute force a 12px by 6px grid.
+		float lineHeight = 12;
+		float charWidth = 6;
 
 		// Variables for text drawing
 		float x = textOffset.x;  // Horizontal text start - typically a small indent
@@ -467,14 +458,17 @@ struct SpellbookTextField : LedDisplayTextField {
 		int selectionStart = std::min(cursor, selection);
 		int selectionEnd = std::max(cursor, selection);
 
+		int lineIndex = 0;  // Line index to match with steps
+
 		// Draw each line of text
 		while (std::getline(lines, line)) {
 			if (y + lineHeight < 0) {
 				y += lineHeight;
 				currentPos += line.size() + 1;
+				lineIndex++;
 				continue;
 			}
-			if (y > args.clipBox.size.y) break;
+			if (y > box.size.y+lineHeight) break;
 
 			for (size_t i = 0; i < line.length(); ++i) {
 				float charX = x + i * charWidth;  // X position of the character
@@ -502,8 +496,19 @@ struct SpellbookTextField : LedDisplayTextField {
 				nvgFill(args.vg);
 			}
 
+			// Draw step numbers in the gutter
+			std::string stepNumber = std::to_string(lineIndex + 1) + "| ";
+			if (module->currentStep == lineIndex) {
+				stepNumber = "------------|"+ stepNumber;
+			}
+			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL);
+			float stepX = -(GRID_SNAP * 5) + (GRID_SNAP * 5 - stepTextWidth);  // Right-align in gutter
+			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(121, 8, 170) : nvgRGB(255, 215, 0));  // Current step in purple, others in gold
+			nvgText(args.vg, stepX, y, stepNumber.c_str(), NULL);
+
 			y += lineHeight;
 			currentPos += line.length() + 1;
+			lineIndex++;
 		}
 
 		nvgResetScissor(args.vg);
@@ -517,14 +522,10 @@ struct SpellbookTextField : LedDisplayTextField {
 		nvgFontFaceId(APP->window->vg, font->handle);
 		nvgFontSize(APP->window->vg, 12);
 		nvgTextAlign(APP->window->vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-
-		float lineHeight = 0;
-		float charWidth = nvgTextBounds(APP->window->vg, 0, 0, "W", NULL, NULL);  // Width of one monospaced character
-		nvgTextMetrics(APP->window->vg, NULL, NULL, &lineHeight);
 		
-		// Forget all that, let's brute force a 12px by 6px grid.
-		lineHeight = 12;
-		charWidth = 6;
+		// Brute force a 12px by 6px grid.
+		float lineHeight = 12;
+		float charWidth = 6;
 
 		mousePos.x -= textOffset.x;
 		mousePos.y -= textOffset.y;
@@ -566,10 +567,10 @@ struct SpellbookTextField : LedDisplayTextField {
 		//box.pos.y = newY;
 		textOffset.y = newY;
 		// Offset stepField to match
-		if (stepField) {
+/* 		if (stepField) {
 			//stepField->box.pos.y = newY;
 			stepField->textOffset.y = newY;
-		}
+		} */
         e.consume(this);
     }
 	
@@ -695,11 +696,11 @@ struct SpellbookWidget : ModuleWidget {
         addChild(textField);
 
         // Step indicator field
-        StepIndicatorField* stepField = createWidget<StepIndicatorField>(mm2px(Vec(GRID_SNAP*2, GRID_SNAP*0.25)));
+/*         StepIndicatorField* stepField = createWidget<StepIndicatorField>(mm2px(Vec(GRID_SNAP*2, GRID_SNAP*0.25)));
         stepField->setSize(Vec(mm2px(GRID_SNAP*2), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
         stepField->module = module;
 		textField->stepField = stepField; // Give textField a reference to stepField
-        addChild(stepField);
+        addChild(stepField); */
 		
         // Ensure text field is populated with current module text
         if (module) {
