@@ -570,56 +570,6 @@ struct SpellbookTextField : LedDisplayTextField {
 		return cleanedText;
 	}
 	
-/*     void onSelectKey(const SelectKeyEvent& e) override {
-        if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
-			if (e.key == GLFW_KEY_ENTER) {
-				std::string text = getText();
-				std::string beforeCursor = text.substr(0, cursor);
-				std::string afterCursor = text.substr(cursor);
-				setText(beforeCursor + "\n" + afterCursor);
-				cursor += 1;  // Move cursor to the start of the new line
-				selection = cursor;  // Reset selection to cursor position
-				module->dirty = true;
-				updateSizeAndOffset();  // Recalculate text box scrolling
-				e.consume(this);
-				return;
-			} else if (e.key == GLFW_KEY_UP || e.key == GLFW_KEY_DOWN) {
-                std::string text = getText();
-                std::vector<int> lineBreaks = {-1};  // Start before first line
-                for (int i = 0; i < (int)text.length(); i++) {
-                    if (text[i] == '\n') lineBreaks.push_back(i);
-                }
-                lineBreaks.push_back(text.length());  // End after last line
-
-                int currentLine = 0;
-                while (currentLine < (int)lineBreaks.size() - 1 && lineBreaks[currentLine + 1] < cursor) {
-                    currentLine++;
-                }
-
-                int lineStart = lineBreaks[currentLine] + 1;
-                //int lineEnd = lineBreaks[currentLine + 1];
-                int posInLine = cursor - lineStart;
-
-                if (e.key == GLFW_KEY_UP && currentLine > 0) {
-                    int prevLineStart = lineBreaks[currentLine - 1] + 1;
-                    int prevLineEnd = lineBreaks[currentLine];
-                    cursor = std::min(prevLineStart + posInLine, prevLineEnd);
-                } else if (e.key == GLFW_KEY_DOWN && currentLine < (int)lineBreaks.size() - 2) {
-                    int nextLineStart = lineBreaks[currentLine + 1] + 1;
-                    int nextLineEnd = lineBreaks[currentLine + 2];
-                    cursor = std::min(nextLineStart + posInLine, nextLineEnd);
-                }
-
-                if (!(e.mods & GLFW_MOD_SHIFT)) {
-                    selection = cursor;
-                }
-                e.consume(this);
-                return;
-            }
-        }
-        LedDisplayTextField::onSelectKey(e);
-    } */
-
 	void onSelectKey(const SelectKeyEvent& e) override {
 		if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
 			if (e.key == GLFW_KEY_ENTER) {
