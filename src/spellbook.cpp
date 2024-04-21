@@ -241,7 +241,7 @@ struct Spellbook : Module {
 				if (!cell.empty()) {
 					if (cell == "X") {
 						stepData[index].voltage = 10.0f;  // Treat 'X' as a gate signal (10 volts)
-						stepData[index].type = 'G';  // Gate
+						stepData[index].type = 'X';  // Gate
 					} else if (cell == "T") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'T';  // 1ms Trigger signal
