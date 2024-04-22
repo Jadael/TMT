@@ -145,7 +145,7 @@ Spellbook sequences are programmed using the RhythML format, a syntax to define 
 
 ### RhythML Features
 - **Decimal Voltages**: Directly specify voltage outputs by writing decimal numbers.
-- **Gate and Trigger Commands**: Use `X` for full-width gates, `T` for a 10ms trigger pulse, or `R` for a 10ms re-trigger; as shorthand for rhythmic sequences.
+- **Gate and Trigger Commands**: Use `X` for full-width gates, `T` for a 1ms trigger pulse, or `R` for a 1ms re-trigger (followed by high gate); as shorthand for rhythmic sequences.
 - **Scientific Pitch Names**: Specify pitches using standard note names (e.g., `C4`, `G#3`), and they are parsed to 1V/oct standard.
 - **MIDI numbers** and **Semitones**, prefixed with `M` or `S` (e.g. `m60` or `s7`). Decimals are allowed.
 - **Percentages**: Numbers ending in `%` (e.g. `50%` or `12.5%`), which are converted so that 100% = 10.0v.
