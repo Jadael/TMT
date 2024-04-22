@@ -34,7 +34,7 @@ struct Timer {
 		return timeLeft;
 	}
 	
-	// Check whether it's been at least `seconds` since the timer started
+	// Check whether it's been at least <seconds> since the timer started
 	bool check(float deltaTime, float seconds) {
 		update(deltaTime);
 		return timeLeft >= seconds;
@@ -49,6 +49,7 @@ struct Spellbook : Module {
     enum InputId {
         CLOCK_INPUT,
         RESET_INPUT,
+		INDEX_INPUT,
         INPUTS_LEN
     };
     enum OutputId {
@@ -66,10 +67,11 @@ struct Spellbook : Module {
     dsp::SchmittTrigger clockTrigger;
 	dsp::SchmittTrigger resetTrigger;
     std::vector<std::vector<StepData>> steps;
-	Timer triggerTimer;
+	Timer triggerTimer; // General purpose stopwatch, used by Triggers and Retriggers
+	Timer resetIgnoreTimer; // Timer to ignore Clock input shortly after Reset
     std::vector<StepData> lastValues;
     int currentStep = 0;
-    std::string text;
+    std::string text = "0 ?Col1, 0 ?Col2, 0 ?Col3, 0 ?Col4\n\n\n\n";
     bool dirty = false;
     bool fullyInitialized = false;
     
@@ -77,6 +79,7 @@ struct Spellbook : Module {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
         configInput(CLOCK_INPUT, "Clock / Next Step");
         configInput(RESET_INPUT, "Reset");
+		configInput(INDEX_INPUT, "Index");
         configOutput(POLY_OUTPUT, "16 voltages from columns");
 
         for (int i = 0; i < 16; ++i) {
@@ -89,6 +92,7 @@ struct Spellbook : Module {
 
     void onReset() override {
         dirty = true;
+		resetIgnoreTimer.set(0.01); // Set the timer to ignore clock inputs for 10ms after reset
     }
 
 	void fromJson(json_t* rootJ) override {
@@ -270,8 +274,12 @@ struct Spellbook : Module {
 		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage())) {
 			currentStep = 0;  // Reset the current step index to 0
 			triggerTimer.reset();  // Reset the timer
+			resetIgnoreTimer.reset(); // Reset the post-reset-clock-ignore period
 			dirty = true;  // Mark the state as needing re-evaluation
 		}
+		
+		bool resetHigh = inputs[RESET_INPUT].getVoltage() >= 5.0f;
+		bool ignoreClock = !resetIgnoreTimer.check(args.sampleTime, 0.01f);
 
 		if (dirty) {
 			parseText();  // Reparse the text into steps
@@ -279,14 +287,25 @@ struct Spellbook : Module {
 			if (steps.empty()) return;  // If still empty after parsing, skip processing
 		}
 
-		if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
+		if (steps.empty()) return;  // Ensure not to proceed if there are no steps
+
+/* 		if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
 			if (!steps.empty()) {  // Only process clock input if there are steps defined
 				currentStep = (currentStep + 1) % steps.size();
 				triggerTimer.reset();  // Reset timer at new step
 			}
+		} */
+		
+		if (!inputs[INDEX_INPUT].isConnected() && !resetHigh && !ignoreClock && !steps.empty()) {
+			if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
+				currentStep = (currentStep + 1) % steps.size();
+				triggerTimer.reset();
+			}
+		} else if (inputs[INDEX_INPUT].isConnected()) {
+			float indexVoltage = inputs[INDEX_INPUT].getVoltage();
+			int numSteps = steps.size();
+			currentStep = clamp((int)(indexVoltage / 10.0f * numSteps), 0, numSteps - 1);
 		}
-
-		if (steps.empty()) return;  // Ensure not to proceed if there are no steps
 
 		outputs[POLY_OUTPUT].setChannels(16);
 		std::vector<StepData>& currentValues = steps[currentStep];
@@ -497,6 +516,10 @@ struct SpellbookTextField : LedDisplayTextField {
     }
 
 	void onDeselect(const DeselectEvent& e) override {
+		cleanup();
+	}
+	
+	void cleanup() {
 		std::string originalText = getText();
 		std::string cleanedText = cleanAndPadText(originalText);
 		
@@ -507,7 +530,6 @@ struct SpellbookTextField : LedDisplayTextField {
 
 		setText(cleanedText);  // This should also trigger the widget to update its display
 		updateSizeAndOffset();
-		//updateSizeAndPosition();  // Update size and position after text update
 	}
 
 	std::string cleanAndPadText(const std::string& originalText) {
@@ -649,7 +671,8 @@ struct SpellbookWidget : ModuleWidget {
 		// GRID_SNAP is a 2hp grid; 10.16mm.
 		// Module is 48hp wide, with 4hp of space on the left side and and right sides for ports
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*1.5)), module, Spellbook::CLOCK_INPUT));
-		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*3)), module, Spellbook::RESET_INPUT));
+		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*3.0)), module, Spellbook::RESET_INPUT));
+		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*4.5)), module, Spellbook::INDEX_INPUT));
 		
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22.5, GRID_SNAP*1)), module, Spellbook::POLY_OUTPUT));
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*2)), module, Spellbook::OUT01_OUTPUT));
@@ -686,7 +709,7 @@ struct SpellbookWidget : ModuleWidget {
         // Ensure text field is populated with current module text
         if (module) {
             textField->setText(module->text);
-			textField->updateSizeAndOffset();
+			textField->cleanup();
         }
 		
     }
