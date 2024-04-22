@@ -1,7 +1,7 @@
 # T's Musical Tools
 A collection of esoteric modules mostly focused around manipulating RNG and polyphonic signals in useful ways.
 
-- (VCV Rack Library plugin page)[https://library.vcvrack.com/TMT]
+- [VCV Rack Library plugin page](https://library.vcvrack.com/TMT)
 
 # Shuffle
 
