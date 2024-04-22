@@ -70,7 +70,7 @@
 	{
       "slug": "Spellbook",
       "name": "Spellbook",
-      "description": "Play RhythML spells.",
+      "description": "Play RhythML formatted text sequences.",
       "tags": [
         "Sequencer",
         "Polyphonic"

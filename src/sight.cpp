@@ -32,7 +32,7 @@ struct SightScope : LightWidget {
     Sight* module;
     const Vec topLeft = Vec(15, 10);
     const Vec bottomRight = Vec(240, 260);
-    const int bufferSize = 4096;
+    const int bufferSize = 512;
     std::vector<std::deque<float>> voltageBuffers;
 
     SightScope(Sight* module) {
@@ -49,7 +49,7 @@ struct SightScope : LightWidget {
 
 		// Generate a biased random index
 		float randomValue = (float)rand() / RAND_MAX;  // Uniform random value between 0 and 1
-		int discardIndex = (int)(bufferSize * std::sqrt(randomValue));  // Biased towards zero
+		int discardIndex = (int)(bufferSize * randomValue);  // Choose an index
 
 		// Shift all elements past the discard index one position to the left
 		for (int i = discardIndex; i < bufferSize - 1; i++) {
