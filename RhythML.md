@@ -112,6 +112,8 @@ B4        , R       , 5
 
 Notice the way this pattern holds notes by using consecutive gates over several steps, using retriggers to ensure a new rising edge for each new pitch.
 
+In general, don't forget you need to explicitly output everything you need, like gates, velocities, CVs, everything! Think, "what would Omri Cohen do?"; think *modular*!
+
 Watch a brief demonstration here:
 
 [![YouTube Demo](https://img.youtube.com/vi/vhQHPlpJW-Q/0.jpg)](https://www.youtube.com/watch?v=vhQHPlpJW-Q)
