@@ -103,11 +103,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.9050967"
-     inkscape:cx="487.79318"
-     inkscape:cy="212.13203"
+     inkscape:zoom="3.6203868"
+     inkscape:cx="829.7456"
+     inkscape:cy="423.43542"
      inkscape:document-units="px"
-     inkscape:current-layer="layer1"
+     inkscape:current-layer="g14463"
      showgrid="false"
      units="mm"
      inkscape:snap-bbox="true"
@@ -188,7 +188,7 @@
      inkscape:groupmode="layer"
      id="g14463"
      inkscape:label="text path"
-     style="display:none">
+     style="display:inline">
     <g
        aria-label="Clock"
        id="text14377"
@@ -257,7 +257,7 @@
     </g>
     <g
        aria-label="Spellbook"
-       transform="rotate(-90)"
+       transform="rotate(-90,2.5578532,-2.5578532)"
        id="text14389"
        style="font-size:2.82222px;line-height:1.25;font-family:'DejaVu Serif';-inkscape-font-specification:'DejaVu Serif';text-align:center;text-anchor:middle;display:inline;fill:#ffd801;stroke-width:0.264583">
       <path
