@@ -243,9 +243,9 @@ struct Spellbook : Module {
 				cell.erase(std::remove_if(cell.begin(), cell.end(), ::isspace), cell.end());  // Clean cell from spaces
 				
 				if (!cell.empty()) {
-					if (cell == "X") {
+					if (cell == "G" || cell == "X") {
 						stepData[index].voltage = 10.0f;  // Treat 'X' as a gate signal (10 volts)
-						stepData[index].type = 'X';  // Gate
+						stepData[index].type = 'G';  // Gate
 					} else if (cell == "T") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'T';  // 1ms Trigger signal
@@ -339,7 +339,7 @@ struct Spellbook : Module {
 					outputValue = step.voltage;
 					break;
 				case 'E':  // Empty cells
-					outputValue = (lastValues[i].type == 'X' || lastValues[i].type == 'T' || lastValues[i].type == 'R') ? 0.0f : lastValues[i].voltage;
+					outputValue = (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R') ? 0.0f : lastValues[i].voltage;
 					break;
 				default:
 					break;
