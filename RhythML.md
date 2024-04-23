@@ -15,15 +15,15 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
    - *Anything that parses to a floating point number is allowed, but note Eurorack convention is to stay within -10 to +10 volts, with a 10 volt range between min and max value, and some modules may behave strangely or not accept voltages outside their expectations.*
 
 2. **Gate and Trigger Commands**:
-   - `T`: Outputs 0v for 1ms, then 10v for 1ms, then 0v thereafter.
+   - `T` or `^`: Outputs 0v for 1ms, then 10v for 1ms, then 0v thereafter.
       - Guarantees a rising edge, regardless of the prior step, and holds a low signal afterward.
-   - `R`: Outputs 0 volts for the first 1ms of the step, then a high signal (10 volts) for the remainder.
+   - `R` or `_`: Outputs 0 volts for the first 1ms of the step, then a high signal (10 volts) for the remainder.
       - Use this to start or re-start a held note.
 	  - Guarantees a rising edge, regardless of the prior step, and holds a high signal afterward.
-   - `X`: Outputs a full width gate signal (10 volts), equivalent to writing `10` in the cell.
-      - Use this to continue a held note.
-      - If the output is already high from a prior retrigger or gate, this will NOT trigger a new rising edge in the signal.
-    - *Gates (as with all signals except for Triggers and Retriggers) are 100% step width; two consecutive gates will output a continuous signal with no break or edge.*
+   - `X` or `G` or `|`: Outputs a full width gate signal (10 volts), equivalent to writing `10` in the cell.
+      - Use this to continue a gate across steps.
+      - If the output is already high from a prior retrigger or gate, this will NOT create a new rising edge in the signal.
+   - *Gates (as with all signals except for Triggers and Retriggers) are 100% step width; two consecutive gates will output a continuous signal with no break or edge.*
 
 3. **Scientific Pitch Names**:
    - Format: `<NoteName><Octave>`
