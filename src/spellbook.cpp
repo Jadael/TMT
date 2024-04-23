@@ -361,6 +361,7 @@ struct SpellbookTextField : LedDisplayTextField {
     math::Vec mousePos;  // To track the mouse position within the widget
     int lastTextPosition = 0; // To store the last calculated text position for display in the debug info
     float lastMouseX = 0.0f, lastMouseY = 0.0f; // To store the exact mouse coordinates passed to the text positioning function
+	bool focused = false;
 
     SpellbookTextField() {
         this->color = nvgRGB(255, 215, 0);  // Gold text color
@@ -368,8 +369,15 @@ struct SpellbookTextField : LedDisplayTextField {
 		//this->fontPath = asset::plugin(pluginInstance, "/res/dum1thin.ttf");
     }
 	
+	
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1) return;  // Only draw on the correct layer
+		
+		if (!focused) {
+			// Autoscroll logic
+			float targetY = -(module->currentStep * lineHeight - box.size.y / 2 + lineHeight / 2);
+			textOffset.y = clamp(targetY, minY, maxY);
+		}
 
 		// Extend the scissor box to include the gutter area
 		nvgScissor(args.vg, args.clipBox.pos.x - GRID_SNAP * 5, args.clipBox.pos.y, 
@@ -502,8 +510,6 @@ struct SpellbookTextField : LedDisplayTextField {
         Widget::onHoverScroll(e);
         float delta = e.scrollDelta.y * 1.0f; // Adjust scroll speed if necessary
         float newY = clamp(textOffset.y + delta, minY, maxY);
-		// Offset the text
-		//box.pos.y = newY;
 		textOffset.y = newY;
         e.consume(this);
     }
@@ -520,7 +526,14 @@ struct SpellbookTextField : LedDisplayTextField {
     }
 
 	void onDeselect(const DeselectEvent& e) override {
+		focused = false;
 		cleanup();
+		LedDisplayTextField::onDeselect(e);
+	}
+	
+	void onSelect(const SelectEvent& e) override {
+		focused = true;
+		LedDisplayTextField::onSelect(e);
 	}
 	
 	void cleanup() {
