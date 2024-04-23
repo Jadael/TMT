@@ -244,13 +244,13 @@ struct Spellbook : Module {
 				cell.erase(std::remove_if(cell.begin(), cell.end(), ::isspace), cell.end());  // Clean cell from spaces
 				
 				if (!cell.empty()) {
-					if (cell == "G" || cell == "X" || cell == "|") {
+					if (cell == "G" || cell == "|") {
 						stepData[index].voltage = 10.0f;  // Treat 'X' as a gate signal (10 volts)
 						stepData[index].type = 'G';  // Gate
 					} else if (cell == "T" || cell == "^") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'T';  // 1ms Trigger signal
-					} else if (cell == "R" || cell == "_") {
+					} else if (cell == "X" || cell == "R" || cell == "_") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'R';  // Retrigger signal (0 for 10ms at start of step)
 					} else {
