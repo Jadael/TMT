@@ -304,7 +304,11 @@ struct Spellbook : Module {
 		} else if (inputs[INDEX_INPUT].isConnected()) {
 			float indexVoltage = inputs[INDEX_INPUT].getVoltage();
 			int numSteps = steps.size();
+			int lastStep = currentStep;
 			currentStep = clamp((int)(indexVoltage / 10.0f * numSteps), 0, numSteps - 1);
+			if (currentStep != lastStep) {
+				triggerTimer.reset();
+			}
 		}
 
 		outputs[POLY_OUTPUT].setChannels(16);
