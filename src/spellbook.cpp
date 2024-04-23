@@ -137,10 +137,11 @@ struct Spellbook : Module {
     }
 
 	// Map to convert note names into semitone offsets relative to C4
+	// b (flat) , ♭ (flat), ♯ (sharp), # (sharp)
     std::vector<std::pair<std::string, int>> noteToSemitone = {
-        {"C#", 1}, {"Db", 1}, {"D#", 3}, {"Eb", 3}, {"F#", 6}, {"Gb", 6}, {"G#", 8},
-        {"Ab", 8}, {"A#", 10}, {"Bb", 10}, {"B", 11}, {"D", 2}, {"G", 7},
-        {"E", 4}, {"F", 5}, {"A", 9}, {"C", 0}
+		{"C#", 1}, {"Db", 1}, {"D#", 3}, {"Eb", 3}, {"F#", 6}, {"Gb", 6}, {"G#", 8}, {"Ab", 8}, {"A#", 10}, {"Bb", 10},
+        {"C♯", 1}, {"D♭", 1}, {"D♯", 3}, {"E♭", 3}, {"F♯", 6}, {"G♭", 6}, {"G♯", 8}, {"A♭", 8}, {"A♯", 10}, {"B♭", 10},
+		{"B", 11}, {"D", 2}, {"G", 7}, {"E", 4}, {"F", 5}, {"A", 9}, {"C", 0}
     };
 
 	// Converts a note name and octave to a voltage based on Eurorack 1V/oct standard
@@ -625,7 +626,6 @@ struct SpellbookTextField : LedDisplayTextField {
 	
 	void onSelectKey(const SelectKeyEvent& e) override {
 		if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
-			int oldCursor = cursor;
 			if (e.key == GLFW_KEY_ENTER) {
 				std::string text = getText();
 				std::string beforeCursor = text.substr(0, cursor);

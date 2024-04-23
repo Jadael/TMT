@@ -28,7 +28,8 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
 3. **Scientific Pitch Names**:
    - Format: `<NoteName><Octave>`
    - Example: `C4`, `G#3`, `Db5`
-   - Valid note names are: C, C#, Db, D, D#, Eb, E, F, F#, Gb, G, G#, Ab, A, A#, Bb, B.
+   - Accidentals can be `#` or `♯` for sharp, and `b` or `♭` for flat. 
+   - Valid note names are: C, C#, C♯, Db, D♭, D, D#, D♯, Eb, E♭, E, F, F#, F♯, Gb, G♭, G, G#, G♯, Ab, A♭, A, A#, A♯, Bb, B♭, B.
    - *If no octave is included, but it is still valid note name, a default octave of 4 is used. For example "C" will be read as "C4".*
    - *Outputs a voltage corresponding to the specified musical note, in Eurorack 1V/oct standard, where C4 = 0V, C#4 = 1/12V, ..., B4 = 11/12V, C5 = 1V, C3 = -1V, etc.*
    
