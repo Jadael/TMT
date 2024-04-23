@@ -416,8 +416,59 @@ struct SpellbookTextField : LedDisplayTextField {
 		int selectionEnd = std::max(cursor, selection);
 
 		int lineIndex = 0;  // Line index to match with steps
+		
+		if (focused) {		
+			// Draw an all-black backdrop, with plenty of bleed
+			nvgBeginPath(args.vg);
+			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 200));
+			nvgRect(args.vg, 0, 0 - lineHeight*4, box.size.x, box.size.y + lineHeight*4);
+			nvgFill(args.vg);
+		} else {
+			// Draw column backgrounds
+			std::getline(lines, line); // Assume the first line gives the column layout
+			std::vector<float> columnWidths;
+			size_t startPos = 0;
+			while (startPos < line.length()) {
+				size_t nextComma = line.find(',', startPos);
+				if (nextComma == std::string::npos) {
+					nextComma = line.length();
+				}
+				size_t columnLength = nextComma - startPos + 1; // Include comma space in the width calculation
+				columnWidths.push_back(columnLength * charWidth);
+				startPos = nextComma + 1; // Skip comma
+			}
+
+			float columnStart = x;
+			float totalWidth = 0;
+			for (size_t i = 0; i < columnWidths.size(); ++i) {
+				nvgBeginPath(args.vg);
+				nvgFillColor(args.vg, i % 2 == 0 ? nvgRGBA(0, 0, 0, 128) : nvgRGBA(16, 16, 16, 128));  // Alternate colors
+				nvgRect(args.vg, columnStart, 0-lineHeight*4, columnWidths[i], box.size.y+lineHeight*4);
+				nvgFill(args.vg);
+				columnStart += columnWidths[i];
+				totalWidth += columnWidths[i];
+			}
+
+			// Calculate remaining width and draw dummy column if there's remaining space
+			float remainingWidth = box.size.x - totalWidth;
+			if (remainingWidth > 0) {
+				nvgBeginPath(args.vg);
+				nvgFillColor(args.vg, (columnWidths.size() % 2 == 0) ? nvgRGBA(16, 16, 16, 128) : nvgRGBA(0, 0, 0, 128));  // Invert so the alternation so the last real column is "continued"
+				nvgRect(args.vg, columnStart, 0-lineHeight*4, remainingWidth, box.size.y+lineHeight*4);
+				nvgFill(args.vg);
+			}
+
+			// Reset stream to start drawing text
+			lines.clear();
+			lines.seekg(0, std::ios::beg);
+		}
 
 		// Draw each line of text
+		NVGcolor textColor = nvgRGB(255, 215, 0); // Bright gold text
+		NVGcolor commaColor = nvgRGB(155, 131, 0); // Dark gold commas
+		NVGcolor commentColor = nvgRGB(158, 80, 191); // Purple comments
+		NVGcolor activeColor = textColor;
+		
 		while (std::getline(lines, line)) {
 			if (y + lineHeight < 0) {
 				y += lineHeight;
@@ -426,7 +477,7 @@ struct SpellbookTextField : LedDisplayTextField {
 				continue;
 			}
 			if (y > box.size.y+lineHeight) break;
-
+			
 			for (size_t i = 0; i < line.length(); ++i) {
 				float charX = x + i * charWidth;  // X position of the character
 
@@ -439,14 +490,21 @@ struct SpellbookTextField : LedDisplayTextField {
 				}
 
 				// Draw the character
+				
 				char str[2] = {line[i], 0};  // Temporary string for character
 				if (line[i] == ',') {
-					nvgFillColor(args.vg, nvgRGB(155, 131, 0)); // Dark gold commas
+					nvgFillColor(args.vg, commaColor); // Dark gold commas
+					nvgText(args.vg, charX, y, str, NULL); // draw the comma
+					activeColor = textColor; // Reset to default color after commas
 				} else {
-					nvgFillColor(args.vg, nvgRGB(255, 215, 0)); // Bright gold text
+					if (line[i] == '?') {
+						activeColor = commentColor; // "Snap" to comment color if we encounter a ?, which will be rest after the enxt comma
+					}
+					nvgFillColor(args.vg, activeColor);
+					nvgText(args.vg, charX, y, str, NULL); // draw the text
 				}
-				nvgText(args.vg, charX, y, str, NULL);
 			}
+			activeColor = textColor; // Reset active color at the end of the line.
 
 			// Draw cursor if within this line
 			if (cursor >= currentPos && cursor < currentPos + (int)line.length() + 1) {
@@ -727,6 +785,7 @@ struct SpellbookWidget : ModuleWidget {
 		
 		
         // Main text field for patch notes
+		// GRID_SNAP is derived from RACK_GRID_WIDTH, which is 1hp. One GRID_SNAP is 2hp in milimeters.
         SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*3, GRID_SNAP*0.25)));
         textField->setSize(Vec(mm2px(GRID_SNAP*18), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
         textField->module = module;
