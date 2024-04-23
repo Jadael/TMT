@@ -377,7 +377,7 @@ struct SpellbookTextField : LedDisplayTextField {
 				cursorLine++;
 			}
 		}
-		textOffset.y = -(cursorLine * lineHeight - box.size.y / 2 + lineHeight / 2);
+		textOffset.y = clamp(-(cursorLine * lineHeight - box.size.y / 2 + lineHeight / 2), minY, maxY);
 	}
 	
 	void drawLayer(const DrawArgs& args, int layer) override {
