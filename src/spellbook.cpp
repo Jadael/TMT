@@ -243,13 +243,13 @@ struct Spellbook : Module {
 				cell.erase(std::remove_if(cell.begin(), cell.end(), ::isspace), cell.end());  // Clean cell from spaces
 				
 				if (!cell.empty()) {
-					if (cell == "G" || cell == "X") {
+					if (cell == "G" || cell == "X" || cell == "|") {
 						stepData[index].voltage = 10.0f;  // Treat 'X' as a gate signal (10 volts)
 						stepData[index].type = 'G';  // Gate
-					} else if (cell == "T") {
+					} else if (cell == "T" || cell == "^") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'T';  // 1ms Trigger signal
-					} else if (cell == "R") {
+					} else if (cell == "R" || cell == "_") {
 						stepData[index].voltage = 10.0f;
 						stepData[index].type = 'R';  // Retrigger signal (0 for 10ms at start of step)
 					} else {
@@ -369,9 +369,19 @@ struct SpellbookTextField : LedDisplayTextField {
 		//this->fontPath = asset::plugin(pluginInstance, "/res/dum1thin.ttf");
     }
 	
+	void scrollToCursor() {
+		std::string text = getText();
+		int cursorLine = 0;
+		for (size_t i = 0; i < (size_t)cursor; ++i) {
+			if (text[i] == '\n') {
+				cursorLine++;
+			}
+		}
+		textOffset.y = -(cursorLine * lineHeight - box.size.y / 2 + lineHeight / 2);
+	}
 	
 	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer != 1) return;  // Only draw on the correct layer
+		if (layer != 1 || !module) return;  // Only draw on the correct layer, and only if active
 		
 		if (!focused) {
 			// Autoscroll logic
@@ -429,12 +439,16 @@ struct SpellbookTextField : LedDisplayTextField {
 
 				// Draw the character
 				char str[2] = {line[i], 0};  // Temporary string for character
-				nvgFillColor(args.vg, nvgRGB(255, 215, 0));  // Text color
+				if (line[i] == ',') {
+					nvgFillColor(args.vg, nvgRGB(155, 131, 0)); // Dark gold commas
+				} else {
+					nvgFillColor(args.vg, nvgRGB(255, 215, 0)); // Bright gold text
+				}
 				nvgText(args.vg, charX, y, str, NULL);
 			}
 
 			// Draw cursor if within this line
-			if (cursor >= currentPos && cursor < currentPos + (int)line.length() + 1 && cursor == selection) {
+			if (cursor >= currentPos && cursor < currentPos + (int)line.length() + 1) {
 				float cursorX = x + (cursor - currentPos) * charWidth;
 				nvgBeginPath(args.vg);
 				nvgFillColor(args.vg, nvgRGB(158, 80, 191));  // Cursor color
@@ -611,6 +625,7 @@ struct SpellbookTextField : LedDisplayTextField {
 	
 	void onSelectKey(const SelectKeyEvent& e) override {
 		if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
+			int oldCursor = cursor;
 			if (e.key == GLFW_KEY_ENTER) {
 				std::string text = getText();
 				std::string beforeCursor = text.substr(0, cursor);
@@ -628,7 +643,7 @@ struct SpellbookTextField : LedDisplayTextField {
 
 				// Recalculate text box scrolling
 				updateSizeAndOffset();
-
+				
 				e.consume(this);
 				return;
 			} else if (e.key == GLFW_KEY_UP || e.key == GLFW_KEY_DOWN) {
@@ -665,6 +680,7 @@ struct SpellbookTextField : LedDisplayTextField {
 				return;
 			}
 		}
+		scrollToCursor(); // Scroll to the cursor after any keypress
 		LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
 	}
 
