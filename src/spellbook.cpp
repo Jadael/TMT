@@ -74,6 +74,7 @@ struct Spellbook : Module {
     std::string text = "0 ?Col1, 0 ?Col2, 0 ?Col3, 0 ?Col4\n\n\n\n"; // A default sequence that outputs four labelled 0s for 4 steps
     bool dirty = false;
     bool fullyInitialized = false;
+	float lineHeight = 12;
     
 	Spellbook() : lastValues(16, {0.0f, 'N'}) {  // Some RhythML commands act differently based on the prior voltage of each channel, so assume all 0s for "before time began"
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -81,7 +82,7 @@ struct Spellbook : Module {
         configInput(RESET_INPUT, "Reset");
 		configInput(INDEX_INPUT, "Index");
         configOutput(POLY_OUTPUT, "16 voltages from columns"); // This poly output will always be exactly 16 channels.
-			// TODO: The compiler keeps complaining about array bounds, because we're basically just pinky-promising ourselves to never change the number of channels and thus the lengths of a lot of array loops just assume 16 channels, but we can't really promise we're never going to go above 16. Need to change something about how we distribute all the right values to all the right channels to avoid that awkwardness.
+			// TODO: The compiler keeps complaining about array bounds, because we're basically just pinky-promising ourselves to never change the number of channels and a lot of loops just ASSUME 16 channels. Need to change something about how we distribute all the right values to all the right channels to avoid that awkwardness.
 
         for (int i = 0; i < 16; ++i) { 
             configOutput(OUT01_OUTPUT + i, "Column " + std::to_string(i + 1));
@@ -92,8 +93,8 @@ struct Spellbook : Module {
     }
 
     void onReset() override {
-        dirty = true;
 		resetIgnoreTimer.set(0.01); // Set the timer to ignore clock inputs for 10ms after reset
+        dirty = true;
     }
 
 	void fromJson(json_t* rootJ) override {
@@ -102,19 +103,28 @@ struct Spellbook : Module {
 		json_t* textJ = json_object_get(rootJ, "text");
 		if (textJ)
 			text = json_string_value(textJ);
+		
 		dirty = true;
 	}
 
 	json_t* dataToJson() override {
 		json_t* rootJ = json_object();
 		json_object_set_new(rootJ, "text", json_stringn(text.c_str(), text.size()));
+		json_object_set_new(rootJ, "lineHeight", json_real(lineHeight));
 		return rootJ;
 	}
 
 	void dataFromJson(json_t* rootJ) override {
+		// Get text buffer
 		json_t* textJ = json_object_get(rootJ, "text");
 		if (textJ)
 			text = json_string_value(textJ);
+		
+		// Get lineHeight (effectively text size / zoom level)
+		json_t* lineHeightJ = json_object_get(rootJ, "lineHeight");
+		if (lineHeightJ)
+			lineHeight = json_number_value(lineHeightJ); 
+
 		dirty = true;
 	}
 
@@ -163,7 +173,7 @@ struct Spellbook : Module {
 			return 0.0f;  // Return default voltage for empty cells
 		}
 
-		// Handling for semitone offset input (e.g., "S7" should be interpreted as 7 semitones above C4)
+		// Handling for semitone offset input (e.g., "S0" should become 0.0 / C4, "S7" should be interpreted as 7 semitones above C4, etc.)
 		if (cell[0] == 'S') {
 			try {
 				float semitoneOffset = std::stof(cell.substr(1));
@@ -340,7 +350,6 @@ struct Spellbook : Module {
 				default:
 					break;
 			}
-
 			outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
 			outputs[POLY_OUTPUT].setVoltage(outputValue, i);
 			lastValues[i].voltage = outputValue;
@@ -353,14 +362,15 @@ struct SpellbookTextField : LedDisplayTextField {
     Spellbook* module;
     float textHeight;
     float minY = 0.0f, maxY = 0.0f; // Vertical scroll limits
-    float lineHeight = 12.0f; // This also gets used as the font size
     math::Vec mousePos;  // To track the mouse position within the widget
     int lastTextPosition = 0; // To store the last calculated text position for display in the debug info
     float lastMouseX = 0.0f, lastMouseY = 0.0f; // To store the exact mouse coordinates passed to the text positioning function
 	bool focused = false;
-	// Brute force a 2:1 monospace grid.
-	float charWidth = lineHeight*0.5;
-
+	
+	// Brute force a 2:1 monospaced grid.
+    float lineHeight = 12.0f; // This also gets used as the font size
+	float charWidth = lineHeight*0.5; // Text is almost always drawn character by character, stepping by this amount
+	
     SpellbookTextField() {
         this->color = nvgRGB(255, 215, 0);  // Gold text color
         this->textOffset = Vec(0,0);
@@ -394,8 +404,11 @@ struct SpellbookTextField : LedDisplayTextField {
 		// Configure font
 		//std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
 		// Load font from cache
-		std::string fontPath = asset::plugin(pluginInstance, "res/dum1thin.ttf");
-		std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
+		//std::string fontPath = asset::plugin(pluginInstance, "res/Hack-Regular.ttf");
+		std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/Hack-Regular.ttf"));
+		if (!font) { // Use app font as a backup
+			std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
+		}
 		if (!font) return;
 		nvgFontFaceId(args.vg, font->handle);
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
@@ -466,6 +479,8 @@ struct SpellbookTextField : LedDisplayTextField {
 		NVGcolor textColor = nvgRGB(255, 215, 0); // Bright gold text
 		NVGcolor commaColor = nvgRGB(155, 131, 0); // Dark gold commas
 		NVGcolor commentColor = nvgRGB(158, 80, 191); // Purple comments
+		NVGcolor commentCharColor = nvgRGB(121, 8, 170); // Dark purple for `?`
+		NVGcolor selectionColor = nvgRGBA(73, 3, 103,128); // Darkest purple for selection highlight
 		NVGcolor currentStepColor = nvgRGB(255, 255, 255); // White current step when autoscrolling
 		NVGcolor lineColor = textColor;
 		NVGcolor activeColor = textColor;
@@ -479,7 +494,10 @@ struct SpellbookTextField : LedDisplayTextField {
 				lineIndex++;
 				continue;
 			}
-			if (y > box.size.y+lineHeight) break;
+			
+			if (y > box.size.y+lineHeight*2) {
+				break; // Stop once we've drawn two extra lines.
+			}
 			
 			// Use brighter color if current step and defocused (playing)
 			if (module->currentStep == lineIndex && !focused) {
@@ -496,7 +514,7 @@ struct SpellbookTextField : LedDisplayTextField {
 				// Draw selection background for this character if within selection bounds
 				if (static_cast<size_t>(currentPos + i) >= static_cast<size_t>(selectionStart) && static_cast<size_t>(currentPos + i) < static_cast<size_t>(selectionEnd)) {
 					nvgBeginPath(args.vg);
-					nvgFillColor(args.vg, nvgRGBA(73, 3, 103, 128));  // Selection color
+					nvgFillColor(args.vg, selectionColor);  // Selection color
 					nvgRect(args.vg, charX+0.5, y+0.5, charWidth-1, lineHeight-1);
 					nvgFill(args.vg);
 				}
@@ -510,10 +528,13 @@ struct SpellbookTextField : LedDisplayTextField {
 					activeColor = lineColor; // Reset to line color after commas
 				} else {
 					if (line[i] == '?') {
-						activeColor = commentColor; // "Snap" to comment color if we encounter a ?, which will be reset after the next comma
+						nvgFillColor(args.vg, commentCharColor); // Set the (maybe new) activeColor
+						nvgText(args.vg, charX, y, str, NULL); // draw the character
+						activeColor = commentColor; // "Snap" to comment color after a ?, which will be untouched until after the next comma
+					} else {
+						nvgFillColor(args.vg, activeColor); // Set the (maybe new) activeColor
+						nvgText(args.vg, charX, y, str, NULL); // draw the character
 					}
-					nvgFillColor(args.vg, activeColor);
-					nvgText(args.vg, charX, y, str, NULL); // draw the text
 				}
 			}
 			// Reset active and line color at the end of the line.
@@ -530,18 +551,20 @@ struct SpellbookTextField : LedDisplayTextField {
 			}
 
 			// Draw step numbers in the gutter
-			std::string stepNumber = std::to_string(lineIndex + 1) + ". ";
+			std::string stepNumber = std::to_string(lineIndex + 1)+"┃";
 			if (module->currentStep == lineIndex) {
-				stepNumber = "@> "+ stepNumber;
+				stepNumber = " "+ stepNumber;
 			}
 			//float stepSize = std::min(lineHeight,14.f);
 			//float centerOffset = stepSize / lineHeight;
-			nvgFontSize(args.vg, std::min(lineHeight,14.f));  // step numbers max out at a smaller size or it looks bad
+			float stepSize = std::min(lineHeight,14.f);
+			float stepY = 0 + (lineHeight - stepSize)*0.5;
+			nvgFontSize(args.vg, stepSize);  // step numbers max out at a smaller size or it looks bad
 			//TODO: make littler labels center to their bigger row 
 			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL); // This ends up averaging their widths to get back to monospace
-			float stepX = -stepTextWidth - 4;  // Right-align in gutter, with constant 12 padding
+			float stepX = -stepTextWidth - 2;  // Right-align in gutter, with constant padding
 			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(158, 80, 191) : nvgRGB(155, 131, 0));  // Current step in purple, others in gold
-			nvgText(args.vg, stepX, y, stepNumber.c_str(), NULL);
+			nvgText(args.vg, stepX, y+stepY, stepNumber.c_str(), NULL);
 
 			y += lineHeight;
 			currentPos += line.length() + 1;
@@ -552,17 +575,7 @@ struct SpellbookTextField : LedDisplayTextField {
 	}
 	
 	int getTextPosition(math::Vec mousePos) override {
-		//std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
-		//if (!font || font->handle == -1)
-		//	return 0;
-
-		//nvgFontFaceId(APP->window->vg, font->handle);
-		//nvgFontSize(APP->window->vg, 12);
-		//nvgTextAlign(APP->window->vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-		
-		// Brute force a 12px by 6px grid.
-		//float lineHeight = 12;
-		//float charWidth = 6;
+		// The Core TextFIeld class tries to actually draw some text to a box so it can decide where all the characters are, but since we brute force a fixed-width grid for characters we just re-use that.
 
 		mousePos.x -= textOffset.x;
 		mousePos.y -= textOffset.y;
@@ -595,7 +608,6 @@ struct SpellbookTextField : LedDisplayTextField {
             minY = 0.0f;  // Content is shorter, no need to scroll
         }
     }
-
 	
     void onHoverScroll(const event::HoverScroll &e) override {
         Widget::onHoverScroll(e);
@@ -607,7 +619,7 @@ struct SpellbookTextField : LedDisplayTextField {
 	
     void updateSizeAndOffset() {
         std::string text = getText();
-        size_t lineCount = std::count(text.begin(), text.end(), '\n') + 1;
+        size_t lineCount = std::count(text.begin(), text.end(),'\n');
         float contentHeight = lineCount * lineHeight;
         
         textHeight = contentHeight;
@@ -632,11 +644,14 @@ struct SpellbookTextField : LedDisplayTextField {
 		std::string cleanedText = cleanAndPadText(originalText);
 		
 		if (module) {
+			std::string priorText = module->text;
+			if (cleanedText != priorText) {
+				module->dirty = true;
+			}
 			module->text = cleanedText;
-			module->dirty = true;
 		}
 
-		setText(cleanedText);  // This should also trigger the widget to update its display
+		setText(cleanedText);  // Make sure to update the text within this widget too
 		updateSizeAndOffset();
 	}
 
@@ -648,41 +663,41 @@ struct SpellbookTextField : LedDisplayTextField {
 
 		size_t maxColumns = 0;
 
-	// First pass: fill rows and find maximum column widths and the maximum number of columns
-	while (std::getline(ss, line)) {
-		std::istringstream lineStream(line);
-		std::string cell;
-		std::vector<std::string> cells;
-		size_t columnIndex = 0;
+		// First pass: fill rows and find maximum column widths and the maximum number of columns
+		while (std::getline(ss, line)) {
+			std::istringstream lineStream(line);
+			std::string cell;
+			std::vector<std::string> cells;
+			size_t columnIndex = 0;
 
-		while (std::getline(lineStream, cell, ',')) {
-			cell.erase(cell.find_last_not_of(" \n\r\t") + 1); // Trim trailing whitespace
-			cell.erase(0, cell.find_first_not_of(" \n\r\t")); // Trim leading whitespace
-			cells.push_back(cell);
+			while (std::getline(lineStream, cell, ',')) {
+				cell.erase(cell.find_last_not_of(" \n\r\t") + 1); // Trim trailing whitespace
+				cell.erase(0, cell.find_first_not_of(" \n\r\t")); // Trim leading whitespace
+				cells.push_back(cell);
 
-			if (columnIndex >= columnWidths.size()) {
-				columnWidths.push_back(cell.size());
-			} else {
-				columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
+				if (columnIndex >= columnWidths.size()) {
+					columnWidths.push_back(cell.size());
+				} else {
+					columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
+				}
+				columnIndex++;
 			}
-			columnIndex++;
+
+			// Remove trailing empty cells
+			while (!cells.empty() && cells.back().empty()) {
+				cells.pop_back();
+			}
+
+			maxColumns = std::max(maxColumns, cells.size());
+			rows.push_back(cells);
 		}
 
-		// Remove trailing empty cells
-		while (!cells.empty() && cells.back().empty()) {
-			cells.pop_back();
+		// Normalize the number of columns in all rows
+		for (auto& row : rows) {
+			while (row.size() < maxColumns) {
+				row.push_back("");  // Add empty strings for missing columns
+			}
 		}
-
-		maxColumns = std::max(maxColumns, cells.size());
-		rows.push_back(cells);
-	}
-
-	// Normalize the number of columns in all rows
-	for (auto& row : rows) {
-		while (row.size() < maxColumns) {
-			row.push_back("");  // Add empty strings for missing columns
-		}
-	}
 
 		// Second pass: construct the cleaned text with proper padding and commas
 		std::string cleanedText;
@@ -699,18 +714,27 @@ struct SpellbookTextField : LedDisplayTextField {
 						cleanedText += std::string(columnWidths[i] - row[i].size(), ' ');
 					}
 				}
+			
 			}
 			cleanedText += '\n';
 		}
-
+		
 		return cleanedText;
 	}
 	
 	void resizeText(float delta) {
-		//if (lineHeight > 4 && lineHeight < 128) lineHeight += delta;
 		float target = lineHeight + delta;
 		lineHeight = clamp(target, 4.f, 128.f);
 		charWidth = lineHeight * 0.5;
+		module->lineHeight = lineHeight;
+		module->dirty = true;
+	}
+	
+	void sizeText(float size) {
+		lineHeight = clamp(size, 4.f, 128.f);
+		charWidth = lineHeight * 0.5;
+		module->lineHeight = lineHeight;
+		module->dirty = true;
 	}
 	
 	void onSelectKey(const SelectKeyEvent& e) override {
@@ -723,8 +747,9 @@ struct SpellbookTextField : LedDisplayTextField {
 				cursor = beforeCursor.length() + 1;  // Set cursor right after the new line
 
 				// Ensure cursor does not go out of bounds
-				if (cursor > text.length()) {
-					cursor = text.length();
+				//int textLength = static_cast<int>(text.length());
+				if (cursor > (int)text.length()) {
+					cursor = (int)text.length();
 				}
 				
 				selection = cursor;  // Reset selection to cursor position
@@ -776,8 +801,7 @@ struct SpellbookTextField : LedDisplayTextField {
 		scrollToCursor(); // Scroll to the cursor after any keypress
 		LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
 	}
-
-
+	
     std::vector<std::string> split(const std::string &s, char delim) {
         std::vector<std::string> elems;
         std::stringstream ss(s);
@@ -794,7 +818,8 @@ struct SpellbookWidget : ModuleWidget {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/spellbook.svg")));
 		
-		// GRID_SNAP is a 2hp grid; 10.16mm.
+		// GRID_SNAP gives us a 10.16mm grid.
+		// GRID_SNAP is derived from RACK_GRID_WIDTH, which is 1hp. One GRID_SNAP is 2hp in milimeters, because 2hp is just right for port spacing.
 		// Module is 48hp wide, with 4hp of space on the left side and and right sides for ports
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*1.5)), module, Spellbook::CLOCK_INPUT));
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*3.0)), module, Spellbook::RESET_INPUT));
@@ -819,16 +844,16 @@ struct SpellbookWidget : ModuleWidget {
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*9)), module, Spellbook::OUT16_OUTPUT));
 		
 		
-        // Main text field for patch notes
-		// GRID_SNAP is derived from RACK_GRID_WIDTH, which is 1hp. One GRID_SNAP is 2hp in milimeters.
+        // Main text field
         SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*3, GRID_SNAP*0.25)));
         textField->setSize(Vec(mm2px(GRID_SNAP*18), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
         textField->module = module;
         addChild(textField);
 		
-        // Ensure text field is populated with current module text
+        // Ensure text field is populated with current module text and lineHeight
         if (module) {
             textField->setText(module->text);
+			textField->sizeText(module->lineHeight);
 			textField->cleanup();
         }
 		
