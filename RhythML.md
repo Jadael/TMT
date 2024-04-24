@@ -66,9 +66,9 @@ Consider using comments as labels:
 
 ```
 E4 ? Pitch, X ? Gate, 10 ? Velocity
-C5        , T       , 8
-D5        , T       , 6
-B4        ,         , 5
+C5        , X       , 8
+D5        , X       , 6
+B4        , X       , 5
 ```
 
 Or to explain musical intentions:
@@ -89,10 +89,10 @@ Or to explain musical intentions:
 Here's a simple RhythML sequence to get started:
 
 ```
-E4 ? Pitch, R ? Gate, 10 ? Velocity
-C5        , T       , 8
-D5        , T       , 6
-B4        , T       , 5
+E4 ? Pitch, X ? Gate, 10 ? Velocity
+C5        , X       , 8
+D5        , X       , 6
+B4        , X       , 5
 ```
 
 In this example, each step sets a pitch in column 1, uses column 2 for gating, and controls a velocity CV in column 3. The sequence plays a C major arpeggio, holding the first note for a full beat, and gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored because of the `?`.
@@ -100,13 +100,13 @@ In this example, each step sets a pitch in column 1, uses column 2 for gating, a
 Here's the same arpeggio, but with a little more rhythmic variation across 8 steps instead of 4, which you could play at a faster clock speed:
 
 ```
-E4 ? Pitch, R ? Gate, 10 ? Velocity
-          , X       , 
-          , X       , 
-C5        , R       , 8
-D5        , R       , 6
+E4 ? Pitch, X ? Gate, 10 ? Velocity
+          , |       , 
+          , |       , 
+C5        , X       , 8
+D5        , X       , 6
           ,         , 
-B4        , R       , 5
+B4        , X       , 5
           ,         , 
 ```
 
