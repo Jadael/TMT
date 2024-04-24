@@ -68,21 +68,22 @@ struct Spellbook : Module {
 	dsp::SchmittTrigger resetTrigger;
     std::vector<std::vector<StepData>> steps;
 	Timer triggerTimer; // General purpose stopwatch, used by Triggers and Retriggers
-	Timer resetIgnoreTimer; // Timer to ignore Clock input shortly after Reset
+	Timer resetIgnoreTimer; // Timer to ignore Clock input briefly after Reset triggers
     std::vector<StepData> lastValues;
     int currentStep = 0;
-    std::string text = "0 ?Col1, 0 ?Col2, 0 ?Col3, 0 ?Col4\n\n\n\n";
+    std::string text = "0 ?Col1, 0 ?Col2, 0 ?Col3, 0 ?Col4\n\n\n\n"; // A default sequence that outputs four labelled 0s for 4 steps
     bool dirty = false;
     bool fullyInitialized = false;
     
-	Spellbook() : lastValues(16, {0.0f, 'N'}) {  // Initialize lastValues with 16 zeros
+	Spellbook() : lastValues(16, {0.0f, 'N'}) {  // Some RhythML commands act differently based on the prior voltage of each channel, so assume all 0s for "before time began"
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
         configInput(CLOCK_INPUT, "Clock / Next Step");
         configInput(RESET_INPUT, "Reset");
 		configInput(INDEX_INPUT, "Index");
-        configOutput(POLY_OUTPUT, "16 voltages from columns");
+        configOutput(POLY_OUTPUT, "16 voltages from columns"); // This poly output will always be exactly 16 channels.
+			// TODO: The compiler keeps complaining about array bounds, because we're basically just pinky-promising ourselves to never change the number of channels and thus the lengths of a lot of array loops just assume 16 channels, but we can't really promise we're never going to go above 16. Need to change something about how we distribute all the right values to all the right channels to avoid that awkwardness.
 
-        for (int i = 0; i < 16; ++i) {
+        for (int i = 0; i < 16; ++i) { 
             configOutput(OUT01_OUTPUT + i, "Column " + std::to_string(i + 1));
             outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
         }
@@ -138,6 +139,7 @@ struct Spellbook : Module {
 
 	// Map to convert note names into semitone offsets relative to C4
 	// b (flat) , ♭ (flat), ♯ (sharp), # (sharp)
+	// TODO: Maybe changes to a syntax like <Note Letter>[0+ Accidentals]<Octave Number>, so we can count and handle double sharps like C##4, etc.?
     std::vector<std::pair<std::string, int>> noteToSemitone = {
 		{"C#", 1}, {"Db", 1}, {"D#", 3}, {"Eb", 3}, {"F#", 6}, {"Gb", 6}, {"G#", 8}, {"Ab", 8}, {"A#", 10}, {"Bb", 10},
         {"C♯", 1}, {"D♭", 1}, {"D♯", 3}, {"E♭", 3}, {"F♯", 6}, {"G♭", 6}, {"G♯", 8}, {"A♭", 8}, {"A♯", 10}, {"B♭", 10},
@@ -351,11 +353,13 @@ struct SpellbookTextField : LedDisplayTextField {
     Spellbook* module;
     float textHeight;
     float minY = 0.0f, maxY = 0.0f; // Vertical scroll limits
-    const float lineHeight = 12.0f;
+    float lineHeight = 12.0f; // This also gets used as the font size
     math::Vec mousePos;  // To track the mouse position within the widget
     int lastTextPosition = 0; // To store the last calculated text position for display in the debug info
     float lastMouseX = 0.0f, lastMouseY = 0.0f; // To store the exact mouse coordinates passed to the text positioning function
 	bool focused = false;
+	// Brute force a 2:1 monospace grid.
+	float charWidth = lineHeight*0.5;
 
     SpellbookTextField() {
         this->color = nvgRGB(255, 215, 0);  // Gold text color
@@ -384,19 +388,21 @@ struct SpellbookTextField : LedDisplayTextField {
 		}
 
 		// Extend the scissor box to include the gutter area
-		nvgScissor(args.vg, args.clipBox.pos.x - GRID_SNAP * 5, args.clipBox.pos.y, 
-				   args.clipBox.size.x + GRID_SNAP * 5, args.clipBox.size.y);
+		nvgScissor(args.vg, args.clipBox.pos.x - GRID_SNAP * 4, args.clipBox.pos.y, 
+				   args.clipBox.size.x + GRID_SNAP * 4, args.clipBox.size.y);
 
 		// Configure font
-		std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
+		//std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
+		// Load font from cache
+		std::string fontPath = asset::plugin(pluginInstance, "res/dum1thin.ttf");
+		std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
 		if (!font) return;
 		nvgFontFaceId(args.vg, font->handle);
-		nvgFontSize(args.vg, 12);  // Example font size
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
 
 		// Brute force a 12px by 6px grid.
-		float lineHeight = 12;
-		float charWidth = 6;
+		//float lineHeight = 14;
+		//float charWidth = 7;
 
 		// Variables for text drawing
 		float x = textOffset.x;  // Horizontal text start - typically a small indent
@@ -413,7 +419,7 @@ struct SpellbookTextField : LedDisplayTextField {
 		if (focused) {		
 			// Draw an all-black backdrop, with plenty of bleed
 			nvgBeginPath(args.vg);
-			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 200));
+			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 140));
 			nvgRect(args.vg, 0, 0 - lineHeight*4, box.size.x, box.size.y + lineHeight*4);
 			nvgFill(args.vg);
 		} else {
@@ -435,7 +441,7 @@ struct SpellbookTextField : LedDisplayTextField {
 			float totalWidth = 0;
 			for (size_t i = 0; i < columnWidths.size(); ++i) {
 				nvgBeginPath(args.vg);
-				nvgFillColor(args.vg, i % 2 == 0 ? nvgRGBA(0, 0, 0, 128) : nvgRGBA(16, 16, 16, 128));  // Alternate colors
+				nvgFillColor(args.vg, i % 2 == 0 ? nvgRGBA(0, 0, 0, 140) : nvgRGBA(16, 16, 16, 140));  // Alternate colors
 				nvgRect(args.vg, columnStart, 0-lineHeight*4, columnWidths[i], box.size.y+lineHeight*4);
 				nvgFill(args.vg);
 				columnStart += columnWidths[i];
@@ -460,9 +466,13 @@ struct SpellbookTextField : LedDisplayTextField {
 		NVGcolor textColor = nvgRGB(255, 215, 0); // Bright gold text
 		NVGcolor commaColor = nvgRGB(155, 131, 0); // Dark gold commas
 		NVGcolor commentColor = nvgRGB(158, 80, 191); // Purple comments
+		NVGcolor currentStepColor = nvgRGB(255, 255, 255); // White current step when autoscrolling
+		NVGcolor lineColor = textColor;
 		NVGcolor activeColor = textColor;
 		
 		while (std::getline(lines, line)) {
+			nvgFontSize(args.vg, lineHeight);  // Brute force match lineHeight
+			
 			if (y + lineHeight < 0) {
 				y += lineHeight;
 				currentPos += line.size() + 1;
@@ -471,14 +481,23 @@ struct SpellbookTextField : LedDisplayTextField {
 			}
 			if (y > box.size.y+lineHeight) break;
 			
+			// Use brighter color if current step and defocused (playing)
+			if (module->currentStep == lineIndex && !focused) {
+				lineColor = currentStepColor;
+			} else {
+				lineColor = textColor;
+			}
+			
+			activeColor = lineColor;
+			
 			for (size_t i = 0; i < line.length(); ++i) {
 				float charX = x + i * charWidth;  // X position of the character
 
 				// Draw selection background for this character if within selection bounds
 				if (static_cast<size_t>(currentPos + i) >= static_cast<size_t>(selectionStart) && static_cast<size_t>(currentPos + i) < static_cast<size_t>(selectionEnd)) {
 					nvgBeginPath(args.vg);
-					nvgFillColor(args.vg, nvgRGBA(73, 3, 103, 200));  // Selection color
-					nvgRect(args.vg, charX, y, charWidth, lineHeight);
+					nvgFillColor(args.vg, nvgRGBA(73, 3, 103, 128));  // Selection color
+					nvgRect(args.vg, charX+0.5, y+0.5, charWidth-1, lineHeight-1);
 					nvgFill(args.vg);
 				}
 
@@ -488,16 +507,18 @@ struct SpellbookTextField : LedDisplayTextField {
 				if (line[i] == ',') {
 					nvgFillColor(args.vg, commaColor); // Dark gold commas
 					nvgText(args.vg, charX, y, str, NULL); // draw the comma
-					activeColor = textColor; // Reset to default color after commas
+					activeColor = lineColor; // Reset to line color after commas
 				} else {
 					if (line[i] == '?') {
-						activeColor = commentColor; // "Snap" to comment color if we encounter a ?, which will be rest after the enxt comma
+						activeColor = commentColor; // "Snap" to comment color if we encounter a ?, which will be reset after the next comma
 					}
 					nvgFillColor(args.vg, activeColor);
 					nvgText(args.vg, charX, y, str, NULL); // draw the text
 				}
 			}
-			activeColor = textColor; // Reset active color at the end of the line.
+			// Reset active and line color at the end of the line.
+			activeColor = textColor;
+			lineColor = textColor;
 
 			// Draw cursor if within this line
 			if (cursor >= currentPos && cursor < currentPos + (int)line.length() + 1) {
@@ -509,12 +530,16 @@ struct SpellbookTextField : LedDisplayTextField {
 			}
 
 			// Draw step numbers in the gutter
-			std::string stepNumber = std::to_string(lineIndex + 1) + "| ";
+			std::string stepNumber = std::to_string(lineIndex + 1) + ". ";
 			if (module->currentStep == lineIndex) {
 				stepNumber = "@> "+ stepNumber;
 			}
-			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL);
-			float stepX = -(GRID_SNAP * 5) + (GRID_SNAP * 5 - stepTextWidth);  // Right-align in gutter
+			//float stepSize = std::min(lineHeight,14.f);
+			//float centerOffset = stepSize / lineHeight;
+			nvgFontSize(args.vg, std::min(lineHeight,14.f));  // step numbers max out at a smaller size or it looks bad
+			//TODO: make littler labels center to their bigger row 
+			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL); // This ends up averaging their widths to get back to monospace
+			float stepX = -stepTextWidth - 4;  // Right-align in gutter, with constant 12 padding
 			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(158, 80, 191) : nvgRGB(155, 131, 0));  // Current step in purple, others in gold
 			nvgText(args.vg, stepX, y, stepNumber.c_str(), NULL);
 
@@ -527,17 +552,17 @@ struct SpellbookTextField : LedDisplayTextField {
 	}
 	
 	int getTextPosition(math::Vec mousePos) override {
-		std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
-		if (!font || font->handle == -1)
-			return 0;
+		//std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
+		//if (!font || font->handle == -1)
+		//	return 0;
 
-		nvgFontFaceId(APP->window->vg, font->handle);
-		nvgFontSize(APP->window->vg, 12);
-		nvgTextAlign(APP->window->vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+		//nvgFontFaceId(APP->window->vg, font->handle);
+		//nvgFontSize(APP->window->vg, 12);
+		//nvgTextAlign(APP->window->vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
 		
 		// Brute force a 12px by 6px grid.
-		float lineHeight = 12;
-		float charWidth = 6;
+		//float lineHeight = 12;
+		//float charWidth = 6;
 
 		mousePos.x -= textOffset.x;
 		mousePos.y -= textOffset.y;
@@ -681,6 +706,13 @@ struct SpellbookTextField : LedDisplayTextField {
 		return cleanedText;
 	}
 	
+	void resizeText(float delta) {
+		//if (lineHeight > 4 && lineHeight < 128) lineHeight += delta;
+		float target = lineHeight + delta;
+		lineHeight = clamp(target, 4.f, 128.f);
+		charWidth = lineHeight * 0.5;
+	}
+	
 	void onSelectKey(const SelectKeyEvent& e) override {
 		if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
 			if (e.key == GLFW_KEY_ENTER) {
@@ -735,6 +767,10 @@ struct SpellbookTextField : LedDisplayTextField {
 				updateSizeAndOffset();  // Always update size and offset after moving cursor
 				e.consume(this);
 				return;
+			} else if (e.keyName == "]" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
+				resizeText(1);
+			} else if (e.keyName == "[" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
+				resizeText(-1);
 			}
 		}
 		scrollToCursor(); // Scroll to the cursor after any keypress
