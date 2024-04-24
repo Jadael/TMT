@@ -289,13 +289,6 @@ struct Spellbook : Module {
 		}
 
 		if (steps.empty()) return;  // Ensure not to proceed if there are no steps
-
-/* 		if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
-			if (!steps.empty()) {  // Only process clock input if there are steps defined
-				currentStep = (currentStep + 1) % steps.size();
-				triggerTimer.reset();  // Reset timer at new step
-			}
-		} */
 		
 		if (!inputs[INDEX_INPUT].isConnected() && !resetHigh && !ignoreClock && !steps.empty()) {
 			if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
@@ -630,35 +623,41 @@ struct SpellbookTextField : LedDisplayTextField {
 
 		size_t maxColumns = 0;
 
-		// First pass: fill rows and find maximum column widths and the maximum number of columns
-		while (std::getline(ss, line)) {
-			std::istringstream lineStream(line);
-			std::string cell;
-			std::vector<std::string> cells;
-			size_t columnIndex = 0;
+	// First pass: fill rows and find maximum column widths and the maximum number of columns
+	while (std::getline(ss, line)) {
+		std::istringstream lineStream(line);
+		std::string cell;
+		std::vector<std::string> cells;
+		size_t columnIndex = 0;
 
-			while (std::getline(lineStream, cell, ',')) {
-				cell.erase(cell.find_last_not_of(" \n\r\t") + 1); // Trim trailing whitespace
-				cell.erase(0, cell.find_first_not_of(" \n\r\t")); // Trim leading whitespace
-				cells.push_back(cell);
+		while (std::getline(lineStream, cell, ',')) {
+			cell.erase(cell.find_last_not_of(" \n\r\t") + 1); // Trim trailing whitespace
+			cell.erase(0, cell.find_first_not_of(" \n\r\t")); // Trim leading whitespace
+			cells.push_back(cell);
 
-				if (columnIndex >= columnWidths.size()) {
-					columnWidths.push_back(cell.size());
-				} else {
-					columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
-				}
-				columnIndex++;
+			if (columnIndex >= columnWidths.size()) {
+				columnWidths.push_back(cell.size());
+			} else {
+				columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
 			}
-			maxColumns = std::max(maxColumns, cells.size());
-			rows.push_back(cells);
+			columnIndex++;
 		}
 
-		// Normalize the number of columns in all rows
-		for (auto& row : rows) {
-			while (row.size() < maxColumns) {
-				row.push_back("");  // Add empty strings for missing columns
-			}
+		// Remove trailing empty cells
+		while (!cells.empty() && cells.back().empty()) {
+			cells.pop_back();
 		}
+
+		maxColumns = std::max(maxColumns, cells.size());
+		rows.push_back(cells);
+	}
+
+	// Normalize the number of columns in all rows
+	for (auto& row : rows) {
+		while (row.size() < maxColumns) {
+			row.push_back("");  // Add empty strings for missing columns
+		}
+	}
 
 		// Second pass: construct the cleaned text with proper padding and commas
 		std::string cleanedText;
@@ -790,13 +789,6 @@ struct SpellbookWidget : ModuleWidget {
         textField->setSize(Vec(mm2px(GRID_SNAP*18), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
         textField->module = module;
         addChild(textField);
-
-        // Step indicator field
-/*         StepIndicatorField* stepField = createWidget<StepIndicatorField>(mm2px(Vec(GRID_SNAP*2, GRID_SNAP*0.25)));
-        stepField->setSize(Vec(mm2px(GRID_SNAP*2), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
-        stepField->module = module;
-		textField->stepField = stepField; // Give textField a reference to stepField
-        addChild(stepField); */
 		
         // Ensure text field is populated with current module text
         if (module) {
