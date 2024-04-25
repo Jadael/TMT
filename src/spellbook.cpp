@@ -425,8 +425,8 @@ struct SpellbookTextField : LedDisplayTextField {
 		float cursorY = cursorLine * lineHeight;
 		float cursorX = cursorPos * charWidth;
 		
-		// Only scroll vertically if the cursor would be out of view, to minimize jumpiness
-		if (cursorY+textOffset.y < 0 || cursorY+textOffset.y > box.size.y) {
+		// Only scroll vertically if the cursor would be out of view (or we're in 'playing' mode), to minimize jumpiness
+		if (cursorY+textOffset.y < 0 || cursorY+textOffset.y > box.size.y || !focused) {
 			textOffset.y = clamp(-(cursorY - box.size.y * 0.5 + lineHeight * 0.5), minY, maxY);
 		}
 		
@@ -474,6 +474,7 @@ struct SpellbookTextField : LedDisplayTextField {
 		float x = textOffset.x;  // Horizontal text start - typically a small indent
 		float y = textOffset.y;  // Vertical scroll offset
 		std::string text = getText();
+		text += "\n"; // Add back in a trailing newline for drawing, else std::string gets confused about line count
 		std::istringstream lines(text);
 		std::string line;
 		int currentPos = 0;  // Current character position in the overall text
@@ -657,7 +658,7 @@ struct SpellbookTextField : LedDisplayTextField {
 			y += lineHeight;
 			textPosition += line.length() + 1;
 		}
-
+		textPosition = clamp(textPosition,0,text.length());
 		return textPosition;
 	}
 	
@@ -680,7 +681,7 @@ struct SpellbookTextField : LedDisplayTextField {
 	
     void updateSizeAndOffset() {
         std::string text = getText();
-        size_t lineCount = std::count(text.begin(), text.end(),'\n');
+        size_t lineCount = std::count(text.begin(), text.end(),'\n')+1; // Need the extra 1 because we don't have a trailing newline
         float contentHeight = lineCount * lineHeight;
         
         textHeight = contentHeight;
@@ -704,6 +705,12 @@ struct SpellbookTextField : LedDisplayTextField {
 	
 	void onSelect(const SelectEvent& e) override {
 		focused = true;
+		// Ensure cursor is not out of bounds
+		if (cursor > (int)text.length()) {
+			cursor = (int)text.length()-1;
+		} else if (cursor < 0) {
+			cursor = 0;
+		}
 		LedDisplayTextField::onSelect(e);
 		// Can't scrollToCursor() here, because you might move while the mouse button is pressed and make a selection.
 	}
@@ -784,7 +791,7 @@ struct SpellbookTextField : LedDisplayTextField {
 			cleanedText += '\n';
 		}
 		// Trim trailing newline, for nicer copy & pasting, scrolling, and cursor handling.
-		cleanedText = cleanedText.erase(cleanedText.find_last_not_of("\n") + 1);
+		cleanedText = "" + cleanedText.erase(cleanedText.find_last_not_of("\n") + 1);
 		return cleanedText;
 	}
 	
@@ -803,33 +810,41 @@ struct SpellbookTextField : LedDisplayTextField {
 		module->dirty = true;
 	}
 	
+	void clampCursor() {
+		// Ensure cursor and selection is not out of bounds
+		if (cursor > (int)text.length()) {
+			cursor = (int)text.length();
+		} else if (cursor < 0) {
+			cursor = 0;
+		}
+		
+		if (selection > (int)text.length()) {
+			selection = (int)text.length();
+		} else if (selection < 0) {
+			selection = 0;
+		}
+	}
+	
 	void onSelectKey(const SelectKeyEvent& e) override {
+		clampCursor();
 		if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
 			if (e.key == GLFW_KEY_ENTER) {
-/* 				if ((e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
-					
-				} else { */
 				std::string text = getText();
 				std::string beforeCursor = text.substr(0, cursor);
 				std::string afterCursor = text.substr(cursor);
 				setText(beforeCursor + "\n" + afterCursor);
 				cursor = beforeCursor.length() + 1;  // Set cursor right after the new line
-
-				// Ensure cursor does not go out of bounds
-				//int textLength = static_cast<int>(text.length());
-				if (cursor > (int)text.length()) {
-					cursor = (int)text.length();
-				}
+				
+				clampCursor();
 				
 				selection = cursor;  // Reset selection to cursor position
 				module->dirty = true;
-
+				
 				// Recalculate text box scrolling
 				updateSizeAndOffset();
 				
 				e.consume(this);
 				return;
-/* 				} */
 			} else if (e.key == GLFW_KEY_UP || e.key == GLFW_KEY_DOWN) {
 				std::string text = getText();
 				std::vector<int> lineBreaks = {-1};  // Start before the first line
@@ -837,15 +852,15 @@ struct SpellbookTextField : LedDisplayTextField {
 					if (text[i] == '\n') lineBreaks.push_back(i);
 				}
 				lineBreaks.push_back(text.length());  // End after the last line
-
+				
 				int currentLine = 0;
 				while (currentLine < (int)lineBreaks.size() - 1 && lineBreaks[currentLine + 1] < cursor) {
 					currentLine++;
 				}
-
+				
 				int lineStart = lineBreaks[currentLine] + 1;
 				int posInLine = cursor - lineStart;
-
+				
 				if (e.key == GLFW_KEY_UP && currentLine > 0) {
 					int prevLineStart = lineBreaks[currentLine - 1] + 1;
 					int prevLineEnd = lineBreaks[currentLine];
@@ -855,7 +870,7 @@ struct SpellbookTextField : LedDisplayTextField {
 					int nextLineEnd = lineBreaks[currentLine + 2];
 					cursor = std::min(nextLineStart + posInLine, nextLineEnd);
 				}
-
+				
 				if (!(e.mods & GLFW_MOD_SHIFT)) {
 					selection = cursor;
 				}
@@ -868,7 +883,9 @@ struct SpellbookTextField : LedDisplayTextField {
 				resizeText(-1);
 			}
 		}
+		clampCursor();
 		LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
+		clampCursor();
 		scrollToCursor(); // Scroll to the cursor after any keypress
 	}
 	
