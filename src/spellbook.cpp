@@ -411,12 +411,18 @@ struct SpellbookTextField : LedDisplayTextField {
 	void scrollToCursor() {
 		std::string text = getText();
 		int cursorLine = 0;
+		int cursorPos = 0;
+		int maxLineLength = 0;
 		for (size_t i = 0; i < (size_t)cursor; ++i) {
+			cursorPos++;
 			if (text[i] == '\n') {
 				cursorLine++;
+				if (cursorPos > maxLineLength) maxLineLength = cursorPos;
+				cursorPos = 0;
 			}
 		}
 		textOffset.y = clamp(-(cursorLine * lineHeight - box.size.y / 2 + lineHeight / 2), minY, maxY);
+		textOffset.x = clamp( -(cursorPos * charWidth - box.size.x / 2.f + charWidth / 2.f), -(maxLineLength * charWidth), 0.f);
 	}
 	
 	void drawLayer(const DrawArgs& args, int layer) override {
@@ -432,11 +438,10 @@ struct SpellbookTextField : LedDisplayTextField {
 				setText(module->text);
 				cleanAndPublishText();
 			}
-		}
+		} // Can't just scroll here in an ELSE, because then you might scroll while the mouse button is pressed and accidentally make a selection
 
-		// Extend the scissor box to include the gutter area
-		nvgScissor(args.vg, args.clipBox.pos.x - GRID_SNAP * 4, args.clipBox.pos.y, 
-				   args.clipBox.size.x + GRID_SNAP * 4, args.clipBox.size.y);
+		// Make sure the scissor matches our box... for now.
+		nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
 
 		// Configure font
 		//std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
@@ -517,8 +522,9 @@ struct SpellbookTextField : LedDisplayTextField {
 		NVGcolor commaColor = nvgRGB(155, 131, 0); // Dark gold commas
 		NVGcolor commentColor = nvgRGB(158, 80, 191); // Purple comments
 		NVGcolor commentCharColor = nvgRGB(121, 8, 170); // Dark purple for `?`
-		NVGcolor selectionColor = nvgRGBA(73, 3, 103,128); // Darkest purple for selection highlight
+		NVGcolor selectionColor = nvgRGB(39, 1, 52); // Darkest purple for selection highlight
 		NVGcolor currentStepColor = nvgRGB(255, 255, 255); // White current step when autoscrolling
+		NVGcolor cursorColor = nvgRGBA(158, 80, 191,192); // Light translucent purple for cursor
 		NVGcolor lineColor = textColor;
 		NVGcolor activeColor = textColor;
 		
@@ -582,10 +588,15 @@ struct SpellbookTextField : LedDisplayTextField {
 			if (cursor >= currentPos && cursor < currentPos + (int)line.length() + 1) {
 				float cursorX = x + (cursor - currentPos) * charWidth;
 				nvgBeginPath(args.vg);
-				nvgFillColor(args.vg, nvgRGB(158, 80, 191));  // Cursor color
-				nvgRect(args.vg, cursorX, y, 1, lineHeight);
+				nvgFillColor(args.vg, cursorColor); 
+				nvgRect(args.vg, cursorX, y, charWidth*0.125f, lineHeight);
 				nvgFill(args.vg);
 			}
+
+			// Extend the scissor box into a gutter area
+				// Kinda rude, this should probably just be an area within this widget's box, but it does mean you can think of the x/y coordinates as belonging to the TEXT, ignoring the step labels.
+			nvgScissor(args.vg, args.clipBox.pos.x - GRID_SNAP * 4, args.clipBox.pos.y, 
+					   args.clipBox.size.x + GRID_SNAP * 4, args.clipBox.size.y);
 
 			// Draw step numbers in the gutter
 			std::string stepNumber = std::to_string(lineIndex + 1)+"┃";
@@ -602,6 +613,9 @@ struct SpellbookTextField : LedDisplayTextField {
 			float stepX = -stepTextWidth - 2;  // Right-align in gutter, with constant padding
 			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(158, 80, 191) : nvgRGB(155, 131, 0));  // Current step in purple, others in gold
 			nvgText(args.vg, stepX, y+stepY, stepNumber.c_str(), NULL);
+			
+			// Back out of the gutter
+			nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
 
 			y += lineHeight;
 			currentPos += line.length() + 1;
@@ -681,6 +695,7 @@ struct SpellbookTextField : LedDisplayTextField {
 	void onSelect(const SelectEvent& e) override {
 		focused = true;
 		LedDisplayTextField::onSelect(e);
+		// Can't scrollToCursor() here, because you might move while the mouse button is pressed and make a selection.
 	}
 	
 	void cleanAndPublishText() {
@@ -838,9 +853,8 @@ struct SpellbookTextField : LedDisplayTextField {
 				resizeText(-1);
 			}
 		}
-		scrollToCursor(); // Scroll to the cursor after any keypress
 		LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
-		
+		scrollToCursor(); // Scroll to the cursor after any keypress
 	}
 	
     std::vector<std::string> split(const std::string &s, char delim) {
