@@ -421,8 +421,19 @@ struct SpellbookTextField : LedDisplayTextField {
 				cursorPos = 0;
 			}
 		}
-		textOffset.y = clamp(-(cursorLine * lineHeight - box.size.y / 2 + lineHeight / 2), minY, maxY);
-		textOffset.x = clamp( -(cursorPos * charWidth - box.size.x / 2.f + charWidth / 2.f), -(maxLineLength * charWidth), 0.f);
+		// Cursor position relative to box
+		float cursorY = cursorLine * lineHeight;
+		float cursorX = cursorPos * charWidth;
+		
+		// Only scroll vertically if the cursor would be out of view, to minimize jumpiness
+		if (cursorY+textOffset.y < 0 || cursorY+textOffset.y > box.size.y) {
+			textOffset.y = clamp(-(cursorY - box.size.y * 0.5 + lineHeight * 0.5), minY, maxY);
+		}
+		
+		// Only scroll horizontally if the cursor would be out of view, to minimize jumpiness
+		if (cursorX+textOffset.x < 0 || cursorX+textOffset.x > box.size.x) {
+			textOffset.x = clamp( -(cursorX - box.size.x * 0.5 + charWidth), -(maxLineLength * charWidth), 0.f);
+		}
 	}
 	
 	void drawLayer(const DrawArgs& args, int layer) override {
@@ -438,7 +449,9 @@ struct SpellbookTextField : LedDisplayTextField {
 				setText(module->text);
 				cleanAndPublishText();
 			}
-		} // Can't just scroll here in an ELSE, because then you might scroll while the mouse button is pressed and accidentally make a selection
+		} else {
+			scrollToCursor(); // This should be fine to do here because we only scroll if the cursor would be out of view?
+		}
 
 		// Make sure the scissor matches our box... for now.
 		nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
@@ -773,7 +786,8 @@ struct SpellbookTextField : LedDisplayTextField {
 			}
 			cleanedText += '\n';
 		}
-		
+		// Trim trailing newline, for nicer copy & pasting, scrolling, and cursor handling.
+		cleanedText = cleanedText.erase(cleanedText.find_last_not_of("\n") + 1);
 		return cleanedText;
 	}
 	
@@ -795,6 +809,9 @@ struct SpellbookTextField : LedDisplayTextField {
 	void onSelectKey(const SelectKeyEvent& e) override {
 		if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
 			if (e.key == GLFW_KEY_ENTER) {
+/* 				if ((e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
+					
+				} else { */
 				std::string text = getText();
 				std::string beforeCursor = text.substr(0, cursor);
 				std::string afterCursor = text.substr(cursor);
@@ -815,6 +832,7 @@ struct SpellbookTextField : LedDisplayTextField {
 				
 				e.consume(this);
 				return;
+/* 				} */
 			} else if (e.key == GLFW_KEY_UP || e.key == GLFW_KEY_DOWN) {
 				std::string text = getText();
 				std::vector<int> lineBreaks = {-1};  // Start before the first line
