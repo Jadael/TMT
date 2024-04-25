@@ -356,6 +356,37 @@ struct Spellbook : Module {
 			lastValues[i].type = step.type;
 		}
 	}
+	
+	void overrideText(std::string newText) {
+		// Update our text and trust the TextField to notice it
+		text = newText;
+		dirty = true;
+	}
+};
+
+// Undo struct holding the two things (prior/next text state) it needs to be able to give back to the module
+struct SpellbookUndoRedoAction : history::ModuleAction {
+	std::string old_text;
+	std::string new_text;
+
+	SpellbookUndoRedoAction(int64_t id, std::string oldText, std::string newText) : old_text{oldText}, new_text{newText} {
+		moduleId = id;
+		name = "Spellbook text edit";
+	}
+
+	void undo() override {
+		Spellbook *module = dynamic_cast<Spellbook*>(APP->engine->getModule(moduleId));
+		if (module) {
+			module->overrideText(this->old_text);
+		}
+	}
+
+	void redo() override {
+	Spellbook *module = dynamic_cast<Spellbook*>(APP->engine->getModule(moduleId));
+		if (module) {
+			module->overrideText(this->new_text);
+		}
+	}
 };
 
 struct SpellbookTextField : LedDisplayTextField {
@@ -390,11 +421,17 @@ struct SpellbookTextField : LedDisplayTextField {
 	
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1 || !module) return;  // Only draw on the correct layer, and only if active
-		
+				
 		if (!focused) {
 			// Autoscroll logic
 			float targetY = -(module->currentStep * lineHeight - box.size.y / 2 + lineHeight / 2);
 			textOffset.y = clamp(targetY, minY, maxY);
+			
+			// Check for fresh text in the module, such as from an undo, and bring it in as if the user had typed it in
+			if (text != module->text) {
+				setText(module->text);
+				cleanAndPublishText();
+			}
 		}
 
 		// Extend the scissor box to include the gutter area
@@ -630,7 +667,14 @@ struct SpellbookTextField : LedDisplayTextField {
 
 	void onDeselect(const DeselectEvent& e) override {
 		focused = false;
-		cleanup();
+		if (module) {
+			std::string priorText = module->text;
+			cleanAndPublishText();
+			if (text != priorText) {
+				// Push an undo action if we made a real change (post cleaning)
+				APP->history->push( new SpellbookUndoRedoAction(module->id, priorText, text) );
+			}
+		}
 		LedDisplayTextField::onDeselect(e);
 	}
 	
@@ -639,19 +683,15 @@ struct SpellbookTextField : LedDisplayTextField {
 		LedDisplayTextField::onSelect(e);
 	}
 	
-	void cleanup() {
-		std::string originalText = getText();
-		std::string cleanedText = cleanAndPadText(originalText);
+	void cleanAndPublishText() {
+		std::string cleanedText = cleanAndPadText(getText());
 		
 		if (module) {
-			std::string priorText = module->text;
-			if (cleanedText != priorText) {
-				module->dirty = true;
-			}
 			module->text = cleanedText;
+			module->dirty = true;
 		}
-
 		setText(cleanedText);  // Make sure to update the text within this widget too
+			// This happens whether or not we successfully updated a module, but we don't exist otherwise, so that's okay?
 		updateSizeAndOffset();
 	}
 
@@ -800,6 +840,7 @@ struct SpellbookTextField : LedDisplayTextField {
 		}
 		scrollToCursor(); // Scroll to the cursor after any keypress
 		LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
+		
 	}
 	
     std::vector<std::string> split(const std::string &s, char delim) {
@@ -850,13 +891,12 @@ struct SpellbookWidget : ModuleWidget {
         textField->module = module;
         addChild(textField);
 		
-        // Ensure text field is populated with current module text and lineHeight
+        // Ensure text field is populated with current module text and lineHeight, and puts a pointer in the module for Undos
         if (module) {
             textField->setText(module->text);
 			textField->sizeText(module->lineHeight);
-			textField->cleanup();
-        }
-		
+			textField->cleanAndPublishText();
+        }	
     }
 };
 
