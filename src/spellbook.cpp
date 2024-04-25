@@ -449,8 +449,6 @@ struct SpellbookTextField : LedDisplayTextField {
 				setText(module->text);
 				cleanAndPublishText();
 			}
-		} else {
-			scrollToCursor(); // This should be fine to do here because we only scroll if the cursor would be out of view?
 		}
 
 		// Make sure the scissor matches our box... for now.
