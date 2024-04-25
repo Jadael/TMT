@@ -564,9 +564,9 @@ struct SpellbookTextField : LedDisplayTextField {
 			
 			for (size_t i = 0; i < line.length(); ++i) {
 				float charX = x + i * charWidth;  // X position of the character
-
-				// Draw selection background for this character if within selection bounds
-				if (static_cast<size_t>(currentPos + i) >= static_cast<size_t>(selectionStart) && static_cast<size_t>(currentPos + i) < static_cast<size_t>(selectionEnd)) {
+				
+				// If focused, draw selection background for this character if within selection bounds
+				if (focused && static_cast<size_t>(currentPos + i) >= static_cast<size_t>(selectionStart) && static_cast<size_t>(currentPos + i) < static_cast<size_t>(selectionEnd)) {
 					nvgBeginPath(args.vg);
 					nvgFillColor(args.vg, selectionColor);  // Selection color
 					nvgRect(args.vg, charX+0.5, y+0.5, charWidth-1, lineHeight-1);
@@ -574,7 +574,6 @@ struct SpellbookTextField : LedDisplayTextField {
 				}
 
 				// Draw the character
-				
 				char str[2] = {line[i], 0};  // Temporary string for character
 				if (line[i] == ',') {
 					nvgFillColor(args.vg, commaColor); // Dark gold commas
@@ -595,8 +594,8 @@ struct SpellbookTextField : LedDisplayTextField {
 			activeColor = textColor;
 			lineColor = textColor;
 
-			// Draw cursor if within this line
-			if (cursor >= currentPos && cursor < currentPos + (int)line.length() + 1) {
+			// If focused, draw cursor if within this line
+			if (focused && cursor >= currentPos && cursor < currentPos + (int)line.length() + 1) {
 				float cursorX = x + (cursor - currentPos) * charWidth;
 				nvgBeginPath(args.vg);
 				nvgFillColor(args.vg, cursorColor); 
