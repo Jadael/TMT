@@ -12,6 +12,8 @@ struct StepData {
 };
 
 struct Timer {
+	// There's probably something in dsp which could handle this better,
+	// it was just easier to conceptualize as a simple "time since start of step" I can check however I want
     float timeLeft = 0.0f;  // Time since timer start in seconds
 
     // Reset to 1 ms
@@ -67,6 +69,8 @@ struct Spellbook : Module {
     dsp::SchmittTrigger clockTrigger;
 	dsp::SchmittTrigger resetTrigger;
     std::vector<std::vector<StepData>> steps;
+	std::vector<std::string> firstRowComments; // Fill in whenever we check row 1
+	std::vector<std::string> currentStepComments; // Continually update as we go, but only if and when we encounter comments, so they're sticky
 	Timer triggerTimer; // General purpose stopwatch, used by Triggers and Retriggers
 	Timer resetIgnoreTimer; // Timer to ignore Clock input briefly after Reset triggers
     std::vector<StepData> lastValues;
@@ -390,22 +394,20 @@ struct SpellbookUndoRedoAction : history::ModuleAction {
 };
 
 struct SpellbookTextField : LedDisplayTextField {
-    Spellbook* module;
-    float textHeight;
+    Spellbook* module; // Reference to the object which is is "the module"
+    float textHeight; // Not sure if this is used, honestly. Probably does something in the TextField class.
     float minY = 0.0f, maxY = 0.0f; // Vertical scroll limits
     math::Vec mousePos;  // To track the mouse position within the widget
     int lastTextPosition = 0; // To store the last calculated text position for display in the debug info
     float lastMouseX = 0.0f, lastMouseY = 0.0f; // To store the exact mouse coordinates passed to the text positioning function
-	bool focused = false;
+	bool focused = false; // Whether we're in text editing (focused) mode or playing mode
 	
 	// Brute force a 2:1 monospaced grid.
     float lineHeight = 12.0f; // This also gets used as the font size
 	float charWidth = lineHeight*0.5; // Text is almost always drawn character by character, stepping by this amount
 	
     SpellbookTextField() {
-        this->color = nvgRGB(255, 215, 0);  // Gold text color
         this->textOffset = Vec(0,0);
-		//this->fontPath = asset::plugin(pluginInstance, "/res/dum1thin.ttf");
     }
 	
 	void scrollToCursor() {
@@ -429,7 +431,7 @@ struct SpellbookTextField : LedDisplayTextField {
 		if (cursorY+textOffset.y < 0 || cursorY+textOffset.y > box.size.y || !focused) {
 			textOffset.y = clamp(-(cursorY - box.size.y * 0.5 + lineHeight * 0.5), minY, maxY);
 		}
-		
+		// Handling axes independantly feels nicer
 		// Only scroll horizontally if the cursor would be out of view, to minimize jumpiness
 		if (cursorX+textOffset.x < 0 || cursorX+textOffset.x > box.size.x) {
 			textOffset.x = clamp( -(cursorX - box.size.x * 0.5 + charWidth), -(maxLineLength * charWidth), 0.f);
@@ -455,9 +457,6 @@ struct SpellbookTextField : LedDisplayTextField {
 		nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
 
 		// Configure font
-		//std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
-		// Load font from cache
-		//std::string fontPath = asset::plugin(pluginInstance, "res/Hack-Regular.ttf");
 		std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/Hack-Regular.ttf"));
 		if (!font) { // Use app font as a backup
 			std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
@@ -832,7 +831,10 @@ struct SpellbookTextField : LedDisplayTextField {
 				std::string text = getText();
 				std::string beforeCursor = text.substr(0, cursor);
 				std::string afterCursor = text.substr(cursor);
-				setText(beforeCursor + "\n" + afterCursor);
+				setText(beforeCursor + "\n," + afterCursor);
+					// a line with a single comma is guaranteed to never be trimmed by any of the parsing processes,
+					// so it's a good minimum for a user-inserted new line
+				
 				cursor = beforeCursor.length() + 1;  // Set cursor right after the new line
 				
 				clampCursor();
