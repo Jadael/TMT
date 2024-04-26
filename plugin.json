@@ -75,6 +75,15 @@
         "Sequencer",
         "Polyphonic"
       ]
+    },
+	{
+      "slug": "Stats",
+      "name": "Stats",
+      "description": "Perform statistical functions on a polyphonic cable.",
+      "tags": [
+        "Utility",
+        "Polyphonic"
+      ]
     }
   ]
 }
