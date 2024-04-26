@@ -766,7 +766,7 @@ struct SpellbookTextField : LedDisplayTextField {
 				}
 				
 				if (firstRow && !comment.empty()) {
-					columnLabels.push_back(comment + " (" + std::to_string(columnIndex + 1) +")");
+					columnLabels.push_back(comment);
 				} else if (firstRow) {
 					columnLabels.push_back("Column " + std::to_string(columnIndex + 1));
 				}
