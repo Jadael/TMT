@@ -34,6 +34,7 @@ struct SightScope : LightWidget {
     const Vec bottomRight = Vec(240, 260);
     const int bufferSize = 512;
     std::vector<std::deque<float>> voltageBuffers;
+	int channels = 1;
 
     SightScope(Sight* module) {
         this->module = module;
@@ -42,7 +43,7 @@ struct SightScope : LightWidget {
     }
 
 	void advanceBuffer(int channel, float inputVoltage) {
-		if (channel >= voltageBuffers.size())
+		if (channel >= (int)voltageBuffers.size())
 			return;
 
 		auto& buffer = voltageBuffers[channel];
@@ -52,6 +53,7 @@ struct SightScope : LightWidget {
 		int discardIndex = (int)(bufferSize * randomValue);  // Choose an index
 
 		// Shift all elements past the discard index one position to the left
+		// TODO: CHange the buffer to something that lets us just MOVE a random column to the end to be overwritten, to avoid all the shifting.
 		for (int i = discardIndex; i < bufferSize - 1; i++) {
 			buffer[i] = buffer[i + 1];
 		}
@@ -59,18 +61,24 @@ struct SightScope : LightWidget {
 		// Place the new sample at the end of the buffer
 		buffer[bufferSize - 1] = inputVoltage;
 	}
+	
+	void step() override {
+        if (!module) {
+            return;
+        }
+		// Handle polyphonic inputs
+		channels = module->inputs[Sight::VOLTAGE_INPUT].getChannels(); // double check channels
+		for (int c = 0; c < channels; c++) {
+			advanceBuffer(c, module->inputs[Sight::VOLTAGE_INPUT].getVoltage(c));
+		}
+		LightWidget::step();
+	}
 
     void drawLight(const DrawArgs& args) override {
         if (!module) {
             return;
         }
-
-        // Handle polyphonic inputs
-        int channels = module->inputs[Sight::VOLTAGE_INPUT].getChannels();
-        for (int c = 0; c < channels; c++) {
-            advanceBuffer(c, module->inputs[Sight::VOLTAGE_INPUT].getVoltage(c));
-        }
-
+		channels = module->inputs[Sight::VOLTAGE_INPUT].getChannels(); // double check channels
         nvgScissor(args.vg, RECT_ARGS(args.clipBox));
         for (int c = 0; c < channels; c++) {
             auto& buffer = voltageBuffers[c];
