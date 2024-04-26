@@ -90,6 +90,7 @@ struct Spellbook : Module {
         fullyInitialized = true;
     }
 	
+	
 	void updateLabels(std::vector<std::string> labels) {
 		// Config the output using comments from Row 1 as labels:
 		for (size_t i = 0; i < labels.size(); ++i) {
@@ -306,10 +307,9 @@ struct Spellbook : Module {
 		if (dirty) {
 			parseText();  // Reparse the text into steps
 			dirty = false;
-			if (steps.empty()) return;  // If still empty after parsing, skip processing
 		}
 
-		if (steps.empty()) return;  // Ensure not to proceed if there are no steps
+		if (steps.empty()) return;  // If still empty after parsing, skip processing
 		
 		if (!inputs[INDEX_INPUT].isConnected() && !resetHigh && !ignoreClock && !steps.empty()) {
 			if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
@@ -970,6 +970,18 @@ struct SpellbookWidget : ModuleWidget {
 			textField->cleanAndPublishText();
         }	
     }
+	
+/* 	void appendContextMenu(Menu* menu) override {
+		Spellbook* module = dynamic_cast<Spellbook*>(this->module);
+
+		menu->addChild(new MenuSeparator);
+
+		// Controls int Module::mode
+		menu->addChild(createIndexPtrSubmenuItem("Mode",
+			{"Hi-fi", "Mid-fi", "Lo-fi"},
+			&module->mode
+		));
+	} */
 };
 
 Model* modelSpellbook = createModel<Spellbook, SpellbookWidget>("Spellbook");
