@@ -21,6 +21,7 @@ struct Stats : Module {
 		COUNT_OUTPUT,
 		SUM_OUTPUT,
 		ASCENDING_OUTPUT,
+		DISTINCT_OUTPUT,
 		OUTPUTS_LEN
 	};
 	enum LightId {
@@ -29,7 +30,7 @@ struct Stats : Module {
 
 	Stats() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Does Nothing");
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Limit Process Rate to 10ms");
 		configInput(POLY_INPUT, "Polyphonic Input");
 		configOutput(MEAN_OUTPUT, "Average (mean)");
 		configOutput(MEDIAN_OUTPUT, "Median");
@@ -39,14 +40,15 @@ struct Stats : Module {
 		configOutput(COUNT_OUTPUT, "Count");
 		configOutput(SUM_OUTPUT, "Sum");
 		configOutput(ASCENDING_OUTPUT, "Ascending");
-		//timer.reset();
+		configOutput(DISTINCT_OUTPUT, "Distinct");
 	}
 	
-	//dsp::TTimer timer;
 	
 	void process(const ProcessArgs& args) override {
-		//if (TOGGLE_SWITCH = 0 && timer.process() < 0.01f) return; // Break early if it hasn't been long enough, unless in Alt Mode
-		if (!inputs[POLY_INPUT].isConnected()) return;  // Abandon if there's no input
+		//if (TOGGLE_SWITCH = 0 && timer.getTime() < 0.01f) return; // Break early if it hasn't been long enough, unless in Alt Mode
+		//timer.reset();
+		
+		if (!inputs[POLY_INPUT].isConnected()) return;  // Break early if there's no input
 
 		int numChannels = inputs[POLY_INPUT].getChannels();
 		outputs[COUNT_OUTPUT].setVoltage((float)numChannels);
@@ -141,7 +143,7 @@ struct Stats : Module {
 struct StatsWidget : ModuleWidget {
 	StatsWidget(Stats* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/blank.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/stats.svg")));
 		
 		addParam(createParamCentered<BrassToggle>(mm2px(Vec(15, 6)), module, Stats::TOGGLE_SWITCH));
 		// Right now this doesn't do anything, but presumably we'll encounter something fun and esoteric for this module's "B Side" to do
@@ -157,6 +159,7 @@ struct StatsWidget : ModuleWidget {
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*7.5)), module, Stats::COUNT_OUTPUT));
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*8.5)), module, Stats::SUM_OUTPUT));
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*9.5)), module, Stats::ASCENDING_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*9.5)), module, Stats::DISTINCT_OUTPUT));
 	}
 };
 

@@ -8,38 +8,32 @@
 
 struct StepData {
     float voltage;
-    char type;  // 'N' for normal, 'T' for trigger, 'R' for retrigger
+    char type;  // 'N' for normal, 'T' for trigger, 'R' for retrigger, 'G' for gate, 'E' for empty
 };
 
 struct Timer {
 	// There's probably something in dsp which could handle this better,
-	// it was just easier to conceptualize as a simple "time since start of step" I can check however I want
-    float timeLeft = 0.0f;  // Time since timer start in seconds
+	// it was just easier to conceptualize as a simple "time since start of step" which I can check however I want
+    float timePassed = 0.0f;  // Time since timer start in seconds
 
-    // Reset to 1 ms
-    void reset() {
-        timeLeft = 0.0f;  // Start timer at 0 on resets
+    void reset() { // Start timer at 0 on resets
+        timePassed = 0.0f; 
     }
 	
-	void set(float seconds) {
-		timeLeft = seconds;
+	void set(float seconds) { // Set the timer to something specific
+		timePassed = seconds;
 	}
-
-    // Update the timer and check if the period has expired
-    void update(float deltaTime) {
-        timeLeft += deltaTime;
+    
+    void update(float deltaTime) { // Update the timer and check if the period has expired
+        timePassed += deltaTime;
     }
 	
-	// Return seconds since timer start
-	float time(float deltaTime) {
-        update(deltaTime);
-		return timeLeft;
+	float time() {// Return seconds since timer start
+		return timePassed;
 	}
 	
-	// Check whether it's been at least <seconds> since the timer started
-	bool check(float deltaTime, float seconds) {
-		update(deltaTime);
-		return timeLeft >= seconds;
+	bool check(float seconds) { // Return whether it's been at least <seconds> since the timer started
+		return timePassed >= seconds;
 	}
 };
 
@@ -288,6 +282,10 @@ struct Spellbook : Module {
 	}
 
 	void process(const ProcessArgs& args) override {
+		// Advance the timers
+		resetIgnoreTimer.update(args.sampleTime);
+		triggerTimer.update(args.sampleTime);
+		
 		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage())) {
 			currentStep = 0;  // Reset the current step index to 0
 			triggerTimer.reset();  // Reset the timer
@@ -296,7 +294,7 @@ struct Spellbook : Module {
 		}
 		
 		bool resetHigh = inputs[RESET_INPUT].getVoltage() >= 5.0f;
-		bool ignoreClock = !resetIgnoreTimer.check(args.sampleTime, 0.01f);
+		bool ignoreClock = !resetIgnoreTimer.check(0.01f);
 
 		if (dirty) {
 			parseText();  // Reparse the text into steps
@@ -330,16 +328,16 @@ struct Spellbook : Module {
 
 			switch (step.type) {
 				case 'T':  // Trigger
-					if (triggerTimer.check(args.sampleTime, 0.002f)) {
+					if (triggerTimer.check(0.002f)) {
 						outputValue = 0.0f;
-					} else if (triggerTimer.check(args.sampleTime, 0.001f)) {
+					} else if (triggerTimer.check(0.001f)) {
 						outputValue = 10.0f;
 					} else {
 						outputValue = 0.0f;
 					}
 					break;
 				case 'R':  // Retrigger
-					if (!triggerTimer.check(args.sampleTime, 0.001f)) {
+					if (!triggerTimer.check(0.001f)) {
 						outputValue = 0.0f;
 					} else {
 						outputValue = 10.0f;
@@ -831,9 +829,9 @@ struct SpellbookTextField : LedDisplayTextField {
 				std::string text = getText();
 				std::string beforeCursor = text.substr(0, cursor);
 				std::string afterCursor = text.substr(cursor);
-				setText(beforeCursor + "\n," + afterCursor);
-					// a line with a single comma is guaranteed to never be trimmed by any of the parsing processes,
-					// so it's a good minimum for a user-inserted new line
+				setText(beforeCursor + "\n" + afterCursor);
+				// Trailing blank lines get trimmed away unless you add a 0 or a comma or something,
+				// but not sure what an intuitive way to convey and/or avoid that would be
 				
 				cursor = beforeCursor.length() + 1;  // Set cursor right after the new line
 				
