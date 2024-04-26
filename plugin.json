@@ -84,6 +84,12 @@
         "Utility",
         "Polyphonic"
       ]
+    },
+	{
+      "slug": "Blankt",
+      "name": "Blankt",
+      "description": "A blank T's Musical Tools panel.",
+      "tags": []
     }
   ]
 }
