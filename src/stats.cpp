@@ -43,19 +43,24 @@ struct Stats : Module {
 		configOutput(DISTINCT_OUTPUT, "Distinct");
 	}
 	
+	bool isDistinct(float newVoltage, float lastVoltage, float tolerance = 0.001) {
+		if (newVoltage == lastVoltage) return false;
+		return fabs(newVoltage - lastVoltage) > tolerance;
+	}
+	
 	
 	void process(const ProcessArgs& args) override {
-		//if (TOGGLE_SWITCH = 0 && timer.getTime() < 0.01f) return; // Break early if it hasn't been long enough, unless in Alt Mode
-		//timer.reset();
 		
-		if (!inputs[POLY_INPUT].isConnected()) return;  // Break early if there's no input
-
+		if (!inputs[POLY_INPUT].isConnected()) { // Break early if there's no input
+			return;
+		}
+		
 		int numChannels = inputs[POLY_INPUT].getChannels();
 		outputs[COUNT_OUTPUT].setVoltage((float)numChannels);
-
+		
+		std::vector<float> voltages;
 		float sum = 0.0f;
 		float product = 1.0f;
-		std::vector<float> voltages;
 
 		for (int i = 0; i < numChannels; i++) {
 			float voltage = inputs[POLY_INPUT].getVoltage(i);
@@ -63,7 +68,7 @@ struct Stats : Module {
 			product *= voltage;
 			voltages.push_back(voltage);
 		}
-
+		
 		outputs[SUM_OUTPUT].setVoltage(sum);
 		outputs[PRODUCT_OUTPUT].setVoltage(product);
 
@@ -72,15 +77,19 @@ struct Stats : Module {
 			outputs[MEAN_OUTPUT].setVoltage(average);
 		}
 		
-		if (outputs[MEAN_OUTPUT].isConnected()) {
+		if (outputs[GEOMETRIC_MEAN_OUTPUT].isConnected()) {
 			float geometricMean = (numChannels > 0) ? pow(product, 1.0f / numChannels) : 0.0f;
 			outputs[GEOMETRIC_MEAN_OUTPUT].setVoltage(geometricMean);
 		}
-
-		if (outputs[MODE_OUTPUT].isConnected() || outputs[MEDIAN_OUTPUT].isConnected() || outputs[ASCENDING_OUTPUT].isConnected()) {
+		
+		if (outputs[MODE_OUTPUT].isConnected()
+			|| outputs[MEDIAN_OUTPUT].isConnected()
+			|| outputs[ASCENDING_OUTPUT].isConnected()
+			|| outputs[DISTINCT_OUTPUT].isConnected()
+			) {
+			
 			// All need a sorted list
 			std::sort(voltages.begin(), voltages.end());
-			// voltages is a vector of floats pulled from the input
 			
 			// Ascending sort
 			if (outputs[ASCENDING_OUTPUT].isConnected()) {
@@ -88,6 +97,26 @@ struct Stats : Module {
 				
 				for (int i = 0; i < numChannels; i++) {
 					outputs[ASCENDING_OUTPUT].setVoltage(voltages[i], i);
+				}
+			}
+			
+			// Distinct
+			if (outputs[DISTINCT_OUTPUT].isConnected()) {
+				std::vector<float> distinctVoltages;
+				
+				// Start with the first value, since we're always going to include it anyway
+				float lastVoltage = voltages[0];
+				distinctVoltages.push_back(lastVoltage);
+				
+				for (float voltage : voltages) {
+					if (isDistinct(voltage,lastVoltage)) {
+						distinctVoltages.push_back(voltage);
+						lastVoltage = voltage;
+					}
+				}
+				outputs[DISTINCT_OUTPUT].setChannels(distinctVoltages.size());
+				for (int i = 0; i < (int)distinctVoltages.size(); i++) {
+					outputs[DISTINCT_OUTPUT].setVoltage(distinctVoltages[i], i);
 				}
 			}
 
@@ -159,7 +188,7 @@ struct StatsWidget : ModuleWidget {
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*7.5)), module, Stats::COUNT_OUTPUT));
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*8.5)), module, Stats::SUM_OUTPUT));
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*9.5)), module, Stats::ASCENDING_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*9.5)), module, Stats::DISTINCT_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*10.5)), module, Stats::DISTINCT_OUTPUT));
 	}
 };
 
