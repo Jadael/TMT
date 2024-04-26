@@ -89,6 +89,13 @@ struct Spellbook : Module {
         outputs[POLY_OUTPUT].setChannels(16);
         fullyInitialized = true;
     }
+	
+	void updateLabels(std::vector<std::string> labels) {
+		// Config the output using comments from Row 1 as labels:
+		for (size_t i = 0; i < labels.size(); ++i) {
+			configOutput(OUT01_OUTPUT + i, labels[i]);
+		}
+	}
 
     void onReset() override {
 		resetIgnoreTimer.set(0.01); // Set the timer to ignore clock inputs for 10ms after reset
@@ -729,6 +736,8 @@ struct SpellbookTextField : LedDisplayTextField {
 		std::string line;
 		std::vector<std::vector<std::string>> rows;
 		std::vector<size_t> columnWidths;
+		std::vector<std::string> columnLabels;
+		bool firstRow = true;
 
 		size_t maxColumns = 0;
 
@@ -743,11 +752,23 @@ struct SpellbookTextField : LedDisplayTextField {
 				cell.erase(cell.find_last_not_of(" \n\r\t") + 1); // Trim trailing whitespace
 				cell.erase(0, cell.find_first_not_of(" \n\r\t")); // Trim leading whitespace
 				cells.push_back(cell);
+				
+				size_t commentStart = cell.find('?');
+				std::string comment;
+				if (commentStart != std::string::npos) {
+					comment = cell.substr(commentStart + 1);
+				}
 
 				if (columnIndex >= columnWidths.size()) {
 					columnWidths.push_back(cell.size());
 				} else {
 					columnWidths[columnIndex] = std::max(columnWidths[columnIndex], cell.size());
+				}
+				
+				if (firstRow && !comment.empty()) {
+					columnLabels.push_back(comment + " (" + std::to_string(columnIndex + 1) +")");
+				} else if (firstRow) {
+					columnLabels.push_back("Column " + std::to_string(columnIndex + 1));
 				}
 				columnIndex++;
 			}
@@ -759,6 +780,7 @@ struct SpellbookTextField : LedDisplayTextField {
 
 			maxColumns = std::max(maxColumns, cells.size());
 			rows.push_back(cells);
+			firstRow = false;
 		}
 
 		// Normalize the number of columns in all rows
@@ -787,6 +809,10 @@ struct SpellbookTextField : LedDisplayTextField {
 			}
 			cleanedText += '\n';
 		}
+		
+		// Update column labels in case we found any
+		module->updateLabels(columnLabels);
+		
 		// Trim trailing newline, for nicer copy & pasting, scrolling, and cursor handling.
 		cleanedText = "" + cleanedText.erase(cleanedText.find_last_not_of("\n") + 1);
 		return cleanedText;
