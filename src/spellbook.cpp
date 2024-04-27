@@ -69,14 +69,30 @@ struct Spellbook : Module {
 	Timer resetIgnoreTimer; // Timer to ignore Clock input briefly after Reset triggers
     std::vector<StepData> lastValues;
     int currentStep = 0;
-    std::string text = "0 ?Column 1, 0 ?Column 2, 0 ?Column 3, 0 ?Column 4\n0, 0, 0, 0\n0, 0, 0, 0\n0, 0, 0, 0"; // A default sequence that outputs four labelled 0s for 4 steps
+    //std::string text = "0 ?Column 1, 0 ?Column 2, 0 ?Column 3, 0 ?Column 4\n0, 0, 0, 0\n0, 0, 0, 0\n0, 0, 0, 0"; // A default sequence that outputs four labelled 0s for 4 steps
+	
+	std::string text = R"(0 ? Decimal                                       , T ? Trigger
+1.0 ? comments starts with ?                      , X ? Gate with retrigger
+-1 ? row 1 comments become output labels          , G ? Full width gate
+1                                                 , | ? alternate full width gate
+? Empty cells don't change the output...          , ? ...except after gates and triggers
+                                                  , 
+C4 ? Also parses note names like `C4` to 1v/oct..., X
+C ? octave 4 is the default if unspecified        , X
+m60 ? ...or MIDI note numbers like `m60`...       , X
+s7 ? ...or semitones from C4 like `s7`.           , X
+? Note: !!! This is not a Tracker !!!             , 
+? just "tracker-like"                             , 
+? Pitches do NOT automatically create triggers... , X ? ...so consider a trigger column
+? Or use columns for ANY CV; such as velocity!    , | ? Think modular!)";
+
     bool dirty = false;
     bool fullyInitialized = false;
 	float lineHeight = 12;
     
 	Spellbook() : lastValues(16, {0.0f, 'N'}) {  // Some RhythML commands act differently based on the prior voltage of each channel, so assume all 0s for "before time began"
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-        configInput(CLOCK_INPUT, "Clock / Next Step");
+        configInput(CLOCK_INPUT, "Advance Step");
         configInput(RESET_INPUT, "Reset");
 		configInput(INDEX_INPUT, "Index");
         configOutput(POLY_OUTPUT, "16 voltages from columns"); // This poly output will always be exactly 16 channels.
