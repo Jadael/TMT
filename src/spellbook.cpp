@@ -344,17 +344,32 @@ s7 ? ...or semitones from C4 like `s7`.           , X
 			int numSteps = steps.size();
 			int lastStep = currentStep;
 			if (params[TOGGLE_SWITCH].getValue() > 0) { 
-				currentStep = (int)indexVoltage % steps.size(); // Phasor mode (default)
+				currentStep = clamp((int)indexVoltage % numSteps,0,numSteps-1); // Absolute mode (alt)
 			} else {
-				currentStep = clamp((int)(indexVoltage / 10.0f * numSteps), 0, numSteps - 1); // Absolute mode (alt)
+				float percentage = indexVoltage/10.f; // Treat 10.v as "1.0" for "100%"
+				
+				float unboundedIndex = percentage * numSteps; // Get the index that is <percentage> through the array
+				
+				//unboundedIndex -= 0.0001f;
+				
+				int targetIndex = (int)unboundedIndex % numSteps;
+				
+				if (targetIndex==0 && std::fabs(unboundedIndex)>1) targetIndex=numSteps;
+				
+				if (targetIndex < 0) targetIndex+=numSteps;
+
+				currentStep = clamp(targetIndex, 0, numSteps-1); // Relative mode (default)
 			}
 			if (currentStep != lastStep) {
 				triggerTimer.reset();
 			}
 		}
 		
-		outputs[RELATIVE_OUTPUT].setVoltage(((float)currentStep/(float)steps.size())*10.f);
-		outputs[ABSOLUTE_OUTPUT].setVoltage((float)(currentStep+1)*1.f);
+		float rowCount = (float)steps.size();
+		float relativeIndex = currentStep / (rowCount-1) * 10.f;
+		float absoluteIndex = (float)currentStep + 1.f;
+		outputs[RELATIVE_OUTPUT].setVoltage( relativeIndex );
+		outputs[ABSOLUTE_OUTPUT].setVoltage( absoluteIndex );
 
 		outputs[POLY_OUTPUT].setChannels(16);
 		std::vector<StepData>& currentValues = steps[currentStep];
@@ -441,6 +456,16 @@ struct SpellbookTextField : LedDisplayTextField {
     float lineHeight = 12.0f; // This also gets used as the font size
 	float charWidth = lineHeight*0.5; // Text is almost always drawn character by character, stepping by this amount
 	
+	NVGcolor textColor = nvgRGB(255, 215, 0); // Bright gold text
+	NVGcolor commaColor = nvgRGB(155, 131, 0); // Dark gold commas
+	NVGcolor commentColor = nvgRGB(158, 80, 191); // Purple comments
+	NVGcolor commentCharColor = nvgRGB(121, 8, 170); // Dark purple for `?`
+	NVGcolor selectionColor = nvgRGB(39, 1, 52); // Darkest purple for selection highlight
+	NVGcolor currentStepColor = nvgRGB(255, 255, 255); // White current step when autoscrolling
+	NVGcolor cursorColor = nvgRGBA(158, 80, 191,192); // Light translucent purple for cursor
+	NVGcolor lineColor = textColor;
+	NVGcolor activeColor = textColor;
+	
     SpellbookTextField() {
         this->textOffset = Vec(0,0);
     }
@@ -487,6 +512,18 @@ struct SpellbookTextField : LedDisplayTextField {
 				cleanAndPublishText();
 			}
 		}
+
+		// Slightly oversized box so we can draw a bordered backdrop for the textfield
+		nvgScissor(args.vg, args.clipBox.pos.x-1, args.clipBox.pos.y-1, args.clipBox.size.x+2, args.clipBox.size.y+2);
+		
+		// Textfield backdrop
+		nvgBeginPath(args.vg);
+		nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 200));
+		nvgRect(args.vg, -1, -1, box.size.x+2, box.size.y+2);
+		nvgFill(args.vg);
+		nvgStrokeColor(args.vg, textColor);  // White color with full opacity
+		nvgStrokeWidth(args.vg, 1.0);  // Set the width of the stroke
+		nvgStroke(args.vg);  // Apply the stroke to the path
 
 		// Make sure the scissor matches our box... for now.
 		nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
@@ -564,15 +601,6 @@ struct SpellbookTextField : LedDisplayTextField {
 		}
 
 		// Draw each line of text
-		NVGcolor textColor = nvgRGB(255, 215, 0); // Bright gold text
-		NVGcolor commaColor = nvgRGB(155, 131, 0); // Dark gold commas
-		NVGcolor commentColor = nvgRGB(158, 80, 191); // Purple comments
-		NVGcolor commentCharColor = nvgRGB(121, 8, 170); // Dark purple for `?`
-		NVGcolor selectionColor = nvgRGB(39, 1, 52); // Darkest purple for selection highlight
-		NVGcolor currentStepColor = nvgRGB(255, 255, 255); // White current step when autoscrolling
-		NVGcolor cursorColor = nvgRGBA(158, 80, 191,192); // Light translucent purple for cursor
-		NVGcolor lineColor = textColor;
-		NVGcolor activeColor = textColor;
 		
 		while (std::getline(lines, line)) {
 			nvgFontSize(args.vg, lineHeight);  // Brute force match lineHeight
