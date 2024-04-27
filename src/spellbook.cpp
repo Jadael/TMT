@@ -54,6 +54,7 @@ struct Spellbook : Module {
         OUT05_OUTPUT, OUT06_OUTPUT, OUT07_OUTPUT, OUT08_OUTPUT,
         OUT09_OUTPUT, OUT10_OUTPUT, OUT11_OUTPUT, OUT12_OUTPUT,
         OUT13_OUTPUT, OUT14_OUTPUT, OUT15_OUTPUT, OUT16_OUTPUT,
+		RELATIVE_OUTPUT, ABSOLUTE_OUTPUT,
         OUTPUTS_LEN
     };
     enum LightId {
@@ -71,20 +72,22 @@ struct Spellbook : Module {
     int currentStep = 0;
     //std::string text = "0 ?Column 1, 0 ?Column 2, 0 ?Column 3, 0 ?Column 4\n0, 0, 0, 0\n0, 0, 0, 0\n0, 0, 0, 0"; // A default sequence that outputs four labelled 0s for 4 steps
 	
-	std::string text = R"(0 ? Decimal                                       , T ? Trigger
+	// Default text is a little tutorial
+	std::string text = R"~(0 ? Decimal                                       , T ? Trigger
 1.0 ? comments starts with ?                      , X ? Gate with retrigger
 -1 ? row 1 comments become output labels          , G ? Full width gate
 1                                                 , | ? alternate full width gate
 ? Empty cells don't change the output...          , ? ...except after gates and triggers
                                                   , 
 C4 ? Also parses note names like `C4` to 1v/oct..., X
-C ? octave 4 is the default if unspecified        , X
+C ? (octave 4 is the default if left out)        , X
 m60 ? ...or MIDI note numbers like `m60`...       , X
 s7 ? ...or semitones from C4 like `s7`.           , X
+50% ? ...or percentages! (useful for velocity) ,
 ? Note: !!! This is not a Tracker !!!             , 
 ? just "tracker-like"                             , 
 ? Pitches do NOT automatically create triggers... , X ? ...so consider a trigger column
-? Or use columns for ANY CV; such as velocity!    , | ? Think modular!)";
+? Or use columns for ANY CV    , | ? Think modular!)~";
 
     bool dirty = false;
     bool fullyInitialized = false;
@@ -94,9 +97,11 @@ s7 ? ...or semitones from C4 like `s7`.           , X
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
         configInput(CLOCK_INPUT, "Advance Step");
         configInput(RESET_INPUT, "Reset");
-		configInput(INDEX_INPUT, "Index");
+		configInput(INDEX_INPUT, "Phasor / Index");
         configOutput(POLY_OUTPUT, "16 voltages from columns"); // This poly output will always be exactly 16 channels.
-
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Toggle relative / absolute indexing");
+		configOutput(RELATIVE_OUTPUT, "Relative Index");
+		configOutput(ABSOLUTE_OUTPUT, "Absolute Index");
 
         for (int i = 0; i < 16; ++i) { 
             configOutput(OUT01_OUTPUT + i, "Column " + std::to_string(i + 1));
@@ -338,11 +343,18 @@ s7 ? ...or semitones from C4 like `s7`.           , X
 			float indexVoltage = inputs[INDEX_INPUT].getVoltage();
 			int numSteps = steps.size();
 			int lastStep = currentStep;
-			currentStep = clamp((int)(indexVoltage / 10.0f * numSteps), 0, numSteps - 1);
+			if (params[TOGGLE_SWITCH].getValue() > 0) { 
+				currentStep = (int)indexVoltage % steps.size(); // Phasor mode (default)
+			} else {
+				currentStep = clamp((int)(indexVoltage / 10.0f * numSteps), 0, numSteps - 1); // Absolute mode (alt)
+			}
 			if (currentStep != lastStep) {
 				triggerTimer.reset();
 			}
 		}
+		
+		outputs[RELATIVE_OUTPUT].setVoltage(((float)currentStep/(float)steps.size())*10.f);
+		outputs[ABSOLUTE_OUTPUT].setVoltage((float)(currentStep+1)*1.f);
 
 		outputs[POLY_OUTPUT].setChannels(16);
 		std::vector<StepData>& currentValues = steps[currentStep];
@@ -634,7 +646,7 @@ struct SpellbookTextField : LedDisplayTextField {
 			// Draw step numbers in the gutter
 			std::string stepNumber = std::to_string(lineIndex + 1)+"┃";
 			if (module->currentStep == lineIndex) {
-				stepNumber = " "+ stepNumber;
+				stepNumber = ""+ stepNumber;
 			}
 			//float stepSize = std::min(lineHeight,14.f);
 			//float centerOffset = stepSize / lineHeight;
@@ -949,6 +961,8 @@ struct SpellbookWidget : ModuleWidget {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/spellbook.svg")));
 		
+		addParam(createParamCentered<BrassToggle>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*6)), module, Spellbook::TOGGLE_SWITCH));
+		
 		// GRID_SNAP gives us a 10.16mm grid.
 		// GRID_SNAP is derived from RACK_GRID_WIDTH, which is 1hp. One GRID_SNAP is 2hp in milimeters, because 2hp is just right for port spacing.
 		// Module is 48hp wide, with 4hp of space on the left side and and right sides for ports
@@ -974,6 +988,8 @@ struct SpellbookWidget : ModuleWidget {
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*9)), module, Spellbook::OUT08_OUTPUT));
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*9)), module, Spellbook::OUT16_OUTPUT));
 		
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*10.5)), module, Spellbook::RELATIVE_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*10.5)), module, Spellbook::ABSOLUTE_OUTPUT));
 		
         // Main text field
         SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*3, GRID_SNAP*0.25)));
