@@ -69,7 +69,7 @@ struct Spellbook : Module {
 	Timer resetIgnoreTimer; // Timer to ignore Clock input briefly after Reset triggers
     std::vector<StepData> lastValues;
     int currentStep = 0;
-    std::string text = "0 ?Col1, 0 ?Col2, 0 ?Col3, 0 ?Col4\n\n\n\n"; // A default sequence that outputs four labelled 0s for 4 steps
+    std::string text = "0 ?Column 1, 0 ?Column 2, 0 ?Column 3, 0 ?Column 4\n0, 0, 0, 0\n0, 0, 0, 0\n0, 0, 0, 0"; // A default sequence that outputs four labelled 0s for 4 steps
     bool dirty = false;
     bool fullyInitialized = false;
 	float lineHeight = 12;
@@ -80,14 +80,16 @@ struct Spellbook : Module {
         configInput(RESET_INPUT, "Reset");
 		configInput(INDEX_INPUT, "Index");
         configOutput(POLY_OUTPUT, "16 voltages from columns"); // This poly output will always be exactly 16 channels.
-			// TODO: The compiler keeps complaining about array bounds, because we're basically just pinky-promising ourselves to never change the number of channels and a lot of loops just ASSUME 16 channels. Need to change something about how we distribute all the right values to all the right channels to avoid that awkwardness.
+
 
         for (int i = 0; i < 16; ++i) { 
             configOutput(OUT01_OUTPUT + i, "Column " + std::to_string(i + 1));
             outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
         }
         outputs[POLY_OUTPUT].setChannels(16);
-        fullyInitialized = true;
+			// TODO: The compiler keeps complaining about array bounds, because we're basically just pinky-promising ourselves to never change the number of channels and a lot of loops just ASSUME 16 channels. Need to change something about how we distribute all the right values to all the right channels to avoid that awkwardness.
+        
+		fullyInitialized = true;
     }
 	
 	
@@ -270,7 +272,7 @@ struct Spellbook : Module {
 						stepData[index].type = 'T';  // 1ms Trigger signal
 					} else if (cell == "X" || cell == "R" || cell == "_") {
 						stepData[index].voltage = 10.0f;
-						stepData[index].type = 'R';  // Retrigger signal (0 for 10ms at start of step)
+						stepData[index].type = 'R';  // Retrigger signal (0.0v for 1ms at start of step)
 					} else {
 						stepData[index].voltage = parsePitch(cell);
 						stepData[index].type = 'N';
