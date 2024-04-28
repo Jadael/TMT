@@ -53,7 +53,7 @@ jobs:
           pushd ${{ env.rack-plugin-toolchain-dir }}
           make plugin-build-${{ matrix.platform }}
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           path: ${{ env.rack-plugin-toolchain-dir }}/plugin-build
           name: ${{ matrix.platform }}
@@ -87,28 +87,34 @@ jobs:
           make dep
           make dist
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           path: dist/*.vcvplugin
           name: mac-${{ matrix.platform }}
+
+  prepare-tags:
+    name: Prepare Tags
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check and Create Tag
+        run: |
+          pluginversion=`jq -r '.version' plugin.json`
+          tag_exists=$(git tag -l "v$pluginversion")
+          if [ -z "$tag_exists" ]; then
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            git tag "v$pluginversion"
+            git push origin "v$pluginversion"
+          fi
 
   publish:
     name: Publish plugin
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    needs: [build, build-mac]
+    needs: [build, build-mac, prepare-tags]
     steps:
       - uses: actions/checkout@v3
-      - name: Check if tag exists
-        id: tag-exists
-        run: |
-          if git rev-parse ${{ github.ref }} >/dev/null 2>&1; then
-            echo "Tag exists!"
-          else
-            echo "Tag does not exist, creating one."
-            git tag ${{ github.ref }}
-            git push origin ${{ github.ref }}
-          fi
       - name: Check if plugin version matches tag
         run: |
           pluginversion=`jq -r '.version' plugin.json`
@@ -116,7 +122,15 @@ jobs:
             echo "Plugin version from plugin.json 'v$pluginversion' doesn't match with tag version '${{ env.CI_REF_NAME }}'"
             exit 1
           fi
-      - name: Create or Replace Release
+      - uses: actions/download-artifact@v3
+        with:
+          path: _artifacts
+      - name: Delete old release if exists
+        uses: dev-drprasad/delete-older-releases@v0.1.0
+        with:
+          keep_latest: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref }}
@@ -125,48 +139,43 @@ jobs:
             ${{ env.CI_REPOSITORY_NAME }} VCV Rack Plugin ${{ env.CI_REF_NAME }}
           draft: false
           prerelease: false
-          overwrite: true
-      - uses: actions/download-artifact@v3
-        with:
-          path: _artifacts
-      - name: Upload release assets
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: _artifacts/**/*.vcvplugin
-          tag: ${{ github.ref }}
+          files: _artifacts/**/*.vcvplugin
           file_glob: true
 
   publish-nightly:
     name: Publish nightly
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    needs: [build, build-mac]
+    needs: [build, build-mac, prepare-tags]
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/download-artifact@v4
         with:
           path: _artifacts
-      - name: Check if nightly tag exists
-        run: |
-          if git tag | grep -q "Nightly"; then
-            echo "Nightly tag exists, deleting..."
-            git tag -d Nightly
-            git push origin :refs/tags/Nightly
-          fi
-          echo "Creating new Nightly tag."
-          git tag Nightly
-          git push origin Nightly
-      - name: Delete old release assets
-        uses: mknejp/delete-release-assets@v1
+
+      - name: Get latest release info
+        id: get_release
+        uses: InsonusK/get-latest-release@v1.0.1
         with:
-          token: ${{ github.token }}
+          myToken: ${{ secrets.GITHUB_TOKEN }}
           tag: Nightly
-          fail-if-no-assets: false
-          assets: '*'
-      - name: Upload release assets
-        uses: svenstaro/upload-release-action@v2
+
+      - name: Delete old release if exists
+        if: steps.get_release.outputs.tag_name != ''
+        uses: dev-drprasad/delete-older-releases@v0.1.0
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: _artifacts/**/*.vcvplugin
-          tag: Nightly
+          keep_latest: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: Nightly
+
+      - name: Create or update nightly release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: Nightly
+          name: Nightly Build
+          body: Nightly build of ${{ env.CI_REPOSITORY_NAME }}
+          draft: false
+          prerelease: true
+          files: _artifacts/**/*.vcvplugin
           file_glob: true
+          allow_updates: true  # Allows updating the release if it already exists without failing
