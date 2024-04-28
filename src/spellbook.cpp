@@ -73,21 +73,22 @@ struct Spellbook : Module {
     //std::string text = "0 ?Column 1, 0 ?Column 2, 0 ?Column 3, 0 ?Column 4\n0, 0, 0, 0\n0, 0, 0, 0\n0, 0, 0, 0"; // A default sequence that outputs four labelled 0s for 4 steps
 	
 	// Default text is a little tutorial
-	std::string text = R"~(0 ? Decimal                                       , T ? Trigger
-1.0 ? comments starts with ?                      , X ? Gate with retrigger
--1 ? row 1 comments become output labels          , G ? Full width gate
-1                                                 , | ? alternate full width gate
-? Empty cells don't change the output...          , ? ...except after gates and triggers
-                                                  , 
-C4 ? Also parses note names like `C4` to 1v/oct..., X
-C ? (octave 4 is the default if left out)        , X
-m60 ? ...or MIDI note numbers like `m60`...       , X
-s7 ? ...or semitones from C4 like `s7`.           , X
-50% ? ...or percentages! (useful for velocity) ,
-? Note: !!! This is not a Tracker !!!             , 
-? just "tracker-like"                             , 
-? Pitches do NOT automatically create triggers... , X ? ...so consider a trigger column
-? Or use columns for ANY CV    , | ? Think modular!)~";
+	std::string text = R"~(0 ? Decimal                                         , T ? Trigger
+1.0 ? text after ? is ignored (for comments)!       , X ? Gate with retrigger
+-1 ? row 1 comments become output labels            , G ? Full width gate
+1                                                   , | ? alternate full width gate
+                                                    , |
+? Empty cells don't change the output...            , ? ...except after gates/triggers
+                                                    , 
+C4 ? Also parses note names like `C4` to 1v/oct...  , X
+C ? (octave 4 is the default if left out)           , X
+m60 ? ...or MIDI note numbers like `m60`...         , X
+s7 ? ...or semitones from C4 like `s7`.             , X
+10% ? ...or percentages! (useful for velocity)      , X
+? Note: !!! This is not a Tracker !!!               , 
+C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger column
+                                                    , X
+? Or use columns for ANY CV                         , | ? Think modular!)~";
 
     bool dirty = false;
     bool fullyInitialized = false;
