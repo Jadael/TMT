@@ -150,7 +150,7 @@ Spellbook sequences are programmed using the RhythML format, a syntax to define 
 
 ### RhythML Features
 - **Decimal Voltages**: Directly specify voltage outputs by writing decimal numbers.
-- **Gate and Trigger Commands**: Use `X` for full-width gates, `T` for a 1ms trigger pulse, or `R` for a 1ms re-trigger (followed by high gate); as shorthand for rhythmic sequences.
+- **Gate and Trigger Commands**: Use `X` for a gate-with-retrigger (guarantees a rising edge), `T` for a 1ms trigger pulse (guarantees a rising edge), or `W` for a full-width gate (no rising edge); as shorthand for rhythmic sequences.
 - **Scientific Pitch Names**: Specify pitches using standard note names (e.g., `C4`, `G#3`), and they are parsed to 1V/oct standard.
 - **MIDI numbers** and **Semitones**, prefixed with `M` or `S` (e.g. `m60` or `s7`). Decimals are allowed.
 - **Percentages**: Numbers ending in `%` (e.g. `50%` or `12.5%`), which are converted so that 100% = 10.0v.
@@ -162,10 +162,10 @@ Refer to [RhythML Syntax Specification](RhythML.md) for comprehensive guidelines
 Here's a simple RhythML sequence to get started:
 
 ```
-E4 ? Pitch, X ? Gate, 10 ? Velocity
-C5        , T       , 8
-D5        , T       , 6
-B4        , T       , 5
+E4 ? Pitch, X ? Gate, 100% ? Velocity
+C5        , T       , 80%
+D5        , T       , 60%
+B4        , T       , 50%
 ```
 
 In this example, each step sets a pitch in column 1, uses column 2 for gating, and controls a velocity CV in column 3. The sequence plays a C major arpeggio, holding the first note for a full beat, and gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored because of the `?`.
@@ -173,13 +173,13 @@ In this example, each step sets a pitch in column 1, uses column 2 for gating, a
 Here's the same arpeggio, but with a little more rhythmic variation:
 
 ```
-E4 ? Pitch, X ? Gate, 10 ? Velocity
+E4 ? Pitch, X ? Gate, 100% ? Velocity
           , X       , 
           , X       , 
-C5        , R       , 8
-D5        , R       , 6
+C5        , R       , 80%
+D5        , R       , 60%
           ,         , 
-B4        , X       , 5
+B4        , X       , 50%
           ,         , 
 ```
 

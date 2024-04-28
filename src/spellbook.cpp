@@ -44,9 +44,9 @@ struct Spellbook : Module {
     };
     enum InputId {
         STEPFWD_INPUT,
-		STEPBAK_INPUT,
         RESET_INPUT,
 		INDEX_INPUT,
+		STEPBAK_INPUT,
         INPUTS_LEN
     };
     enum OutputId {

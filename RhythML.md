@@ -19,7 +19,7 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
 	  - Guarantees a rising edge, regardless of the prior step, and holds a high signal afterward.
    - `T` or `^`: Outputs 0v for 1ms, then 10v for 1ms, then 0v thereafter.
       - Guarantees a rising edge, regardless of the prior step, and holds a low signal afterward.
-   - `G` or `|`: Outputs a full width gate signal (10 volts), equivalent to writing `10` in the cell.
+   - `W` or `|`: Outputs a full width gate signal (10 volts), equivalent to writing `10` in the cell.
       - Use this to continue a gate across steps.
       - If the output is already high from a prior retrigger or gate, this will NOT create a new rising edge in the signal.
        - *Gates (as with all signals except for Triggers and Retriggers) are 100% width; two consecutive gates will output a continuous signal with no break or edge.*
@@ -27,8 +27,7 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
 3. **Scientific Pitch Names**:
    - Format: `<NoteName><Octave>`
    - Example: `C4`, `G#3`, `Db5`
-   - Accidentals can be `#` or `♯` for sharp, and `b` or `♭` for flat. 
-   - Valid note names are: C, C#, C♯, Db, D♭, D, D#, D♯, Eb, E♭, E, F, F#, F♯, Gb, G♭, G, G#, G♯, Ab, A♭, A, A#, A♯, Bb, B♭, B.
+   - Accidentals can be `#` or `♯` for sharp, and `b` or `♭` for flat. Double charps and flats are allowed, and accidentals can be on any note, so `E#` is the same note as `F`.
    - *If no octave is included, but it is still valid note name, a default octave of 4 is used. For example "C" will be read as "C4".*
    - *Outputs a voltage corresponding to the specified musical note, in Eurorack 1V/oct standard, where C4 = 0V, C#4 = 1/12V, ..., B4 = 11/12V, C5 = 1V, C3 = -1V, etc.*
    
