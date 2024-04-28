@@ -1,0 +1,80 @@
+name: Nightly Build VCV Rack Plugin
+
+on:
+  schedule:
+    # Run this workflow at 00:05 UTC every day
+    - cron: '5 0 * * *'
+
+jobs:
+  check-commits:
+    runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch all history so we can check for today's changes
+      - id: filter
+        run: |
+          if git log --since="yesterday.midnight" --until="midnight" --oneline; then
+            echo "changes=true" >> $GITHUB_ENV
+          else
+            echo "changes=false" >> $GITHUB_ENV
+          fi
+
+  build-and-release:
+    needs: check-commits
+    if: needs.check-commits.outputs.changes == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup tag and version
+        run: |
+          DATE=`date +%Y%m%d`
+          echo "NIGHTLY_TAG=v$DATE-nightly" >> $GITHUB_ENV
+      - name: Create tag
+        run: |
+          git tag $NIGHTLY_TAG
+          git push origin $NIGHTLY_TAG
+      - name: Modify plugin version for nightly
+        run: |
+          gitrev=`git rev-parse --short HEAD`
+          pluginversion=`jq -r '.version' plugin.json`
+          nightly_version="$pluginversion-nightly-$DATE-$gitrev"
+          jq --arg VERSION "$nightly_version" '.version=$VERSION' plugin.json > plugin_temp.json
+          mv plugin_temp.json plugin.json
+      - uses: actions/cache@v4
+        with:
+          path: plugin.json
+          key: ${{ github.sha }}-${{ github.run_id }}
+      - name: Build plugin
+        run: |
+          export PLUGIN_DIR=$GITHUB_WORKSPACE
+          pushd /home/build/rack-plugin-toolchain
+          make plugin-build-win-x64
+          make plugin-build-lin-x64
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: /home/build/rack-plugin-toolchain/plugin-build
+          name: nightly-${{ matrix.platform }}
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.NIGHTLY_TAG }}
+          release_name: Nightly Release ${{ env.NIGHTLY_TAG }}
+          body: Nightly build of ${{ github.repository }} as of ${{ env.NIGHTLY_TAG }}
+          draft: false
+          prerelease: true
+      - uses: actions/download-artifact@v2
+        with:
+          path: _artifacts
+      - name: Upload release assets
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: _artifacts/**/*.vcvplugin
+          tag: ${{ env.NIGHTLY_TAG }}
+          file_glob: true
