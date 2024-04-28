@@ -3,6 +3,32 @@
 
 #define GRID_SNAP 10.16 // A 2hp grid in millimeters. 1 GRID_SNAP is just the right spacing for adjacent ports on the module
 
+struct Timer {
+	// There's probably something in dsp which could handle this better,
+	// it was just easier to conceptualize as a simple "time since reset" which I can check however I want
+    float timePassed = 0.0f;  // Time since timer start in seconds
+
+    void reset() { // Start timer at 0 on resets
+        timePassed = 0.0f; 
+    }
+	
+	void set(float seconds) { // Set the timer to something specific
+		timePassed = seconds;
+	}
+    
+    void update(float deltaTime) { // Update the timer and check if the period has expired
+        timePassed += deltaTime;
+    }
+	
+	float time() {// Return seconds since timer start
+		return timePassed;
+	}
+	
+	bool check(float seconds) { // Return whether it's been at least <seconds> since the timer started
+		return timePassed >= seconds;
+	}
+};
+
 struct Stats : Module {
 	enum ParamId {
 		TOGGLE_SWITCH,
@@ -27,10 +53,12 @@ struct Stats : Module {
 	enum LightId {
 		LIGHTS_LEN
 	};
+	
+	Timer timeSinceUpdate;
 
 	Stats() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Limit Process Rate to 10ms");
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode: Process at audio rate (CPU heavy)");
 		configInput(POLY_INPUT, "Polyphonic Input");
 		configOutput(MEAN_OUTPUT, "Average (mean)");
 		configOutput(MEDIAN_OUTPUT, "Median");
@@ -41,6 +69,7 @@ struct Stats : Module {
 		configOutput(SUM_OUTPUT, "Sum");
 		configOutput(ASCENDING_OUTPUT, "Ascending");
 		configOutput(DISTINCT_OUTPUT, "Distinct");
+		timeSinceUpdate.reset();
 	}
 	
 	bool isDistinct(float newVoltage, float lastVoltage, float tolerance = 0.001) {
@@ -50,10 +79,18 @@ struct Stats : Module {
 	
 	
 	void process(const ProcessArgs& args) override {
+		timeSinceUpdate.update(args.sampleTime); // Advance the timer
 		
-		if (!inputs[POLY_INPUT].isConnected()) { // Break early if there's no input
-			return;
+		if (!inputs[POLY_INPUT].isConnected()) {
+			return; // Break early if there's no input
 		}
+		
+		// Check the timer/toggle for processing rate
+		if (!timeSinceUpdate.check(0.01f) && params[TOGGLE_SWITCH].getValue() < 0.5f) {
+			return; // Break early if it's been less than 10ms, unless we're in Alt mode
+		}
+		
+		timeSinceUpdate.reset(); // Reset the timer, since we're about to re-process all the stats
 		
 		int numChannels = inputs[POLY_INPUT].getChannels();
 		outputs[COUNT_OUTPUT].setVoltage((float)numChannels);

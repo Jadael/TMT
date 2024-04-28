@@ -43,7 +43,8 @@ struct Spellbook : Module {
         PARAMS_LEN
     };
     enum InputId {
-        CLOCK_INPUT,
+        STEPFWD_INPUT,
+		STEPBAK_INPUT,
         RESET_INPUT,
 		INDEX_INPUT,
         INPUTS_LEN
@@ -61,7 +62,8 @@ struct Spellbook : Module {
         LIGHTS_LEN
     };
 
-    dsp::SchmittTrigger clockTrigger;
+    dsp::SchmittTrigger stepForwardTrigger;
+	dsp::SchmittTrigger stepBackTrigger;
 	dsp::SchmittTrigger resetTrigger;
     std::vector<std::vector<StepData>> steps;
 	std::vector<std::string> firstRowComments; // Fill in whenever we check row 1
@@ -76,7 +78,7 @@ struct Spellbook : Module {
 	std::string text = R"~(0 ? Decimal                                         , T ? Trigger
 1.0 ? text after ? is ignored (for comments)!       , X ? Gate with retrigger
 -1 ? row 1 comments become output labels            , G ? Full width gate
-1                                                   , | ? alternate full width gate
+1 ? (sorry no row 0 / header row... yet!)                  , | ? alternate full width gate
                                                     , |
 ? Empty cells don't change the output...            , ? ...except after gates/triggers
                                                     , 
@@ -85,10 +87,12 @@ C ? (octave 4 is the default if left out)           , X
 m60 ? ...or MIDI note numbers like `m60`...         , X
 s7 ? ...or semitones from C4 like `s7`.             , X
 10% ? ...or percentages! (useful for velocity)      , X
-? Note: !!! This is not a Tracker !!!               , 
+? Important !!! This is not a Tracker !!!               , 
 C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger column
-                                                    , X
+                                                    , X ? or triggers from somewhere else
 ? Or use columns for ANY CV                         , | ? Think modular!)~";
+
+	std::string defaultText = text;
 
     bool dirty = false;
     bool fullyInitialized = false;
@@ -96,9 +100,10 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     
 	Spellbook() : lastValues(16, {0.0f, 'N'}) {  // Some RhythML commands act differently based on the prior voltage of each channel, so assume all 0s for "before time began"
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-        configInput(CLOCK_INPUT, "Advance Step");
+        configInput(STEPFWD_INPUT, "Step Forward");
+		configInput(STEPBAK_INPUT, "Step Backward");
         configInput(RESET_INPUT, "Reset");
-		configInput(INDEX_INPUT, "Phasor / Index");
+		configInput(INDEX_INPUT, "Index (Relative / Phasor-like)");
         configOutput(POLY_OUTPUT, "16 voltages from columns"); // This poly output will always be exactly 16 channels.
 		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Toggle relative / absolute indexing");
 		configOutput(RELATIVE_OUTPUT, "Relative Index");
@@ -124,6 +129,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 
     void onReset() override {
 		resetIgnoreTimer.set(0.01); // Set the timer to ignore clock inputs for 10ms after reset
+		text = defaultText;
         dirty = true;
     }
 
@@ -179,11 +185,9 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 
 	// Map to convert note names into semitone offsets relative to C4
 	// b (flat) , ♭ (flat), ♯ (sharp), # (sharp)
-	// TODO: Maybe changes to a syntax like <Note Letter>[0+ Accidentals]<Octave Number>, so we can count and handle double sharps like C##4, etc.?
+	// TODO: Maybe changes to a syntax like <Note Letter>[Accidentals]<Octave Number>, so we can count and handle double sharps like C##4, etc.?
     std::vector<std::pair<std::string, int>> noteToSemitone = {
-		{"C#", 1}, {"Db", 1}, {"D#", 3}, {"Eb", 3}, {"F#", 6}, {"Gb", 6}, {"G#", 8}, {"Ab", 8}, {"A#", 10}, {"Bb", 10},
-        {"C♯", 1}, {"D♭", 1}, {"D♯", 3}, {"E♭", 3}, {"F♯", 6}, {"G♭", 6}, {"G♯", 8}, {"A♭", 8}, {"A♯", 10}, {"B♭", 10},
-		{"B", 11}, {"D", 2}, {"G", 7}, {"E", 4}, {"F", 5}, {"A", 9}, {"C", 0}
+		{"C##",2},{"Cbb",-2},{"C#",1},{"Cb",-1},{"C♯",1},{"C♭",-1},{"C♯♯",2},{"C♭♭",-2},{"C",0},{"D##",4},{"Dbb",0},{"D#",3},{"Db",1},{"D♯",3},{"D♭",1},{"D♯♯",4},{"D♭♭",0},{"D",2},{"E##",6},{"Ebb",2},{"E#",5},{"Eb",3},{"E♯",5},{"E♭",3},{"E♯♯",6},{"E♭♭",2},{"E",4},{"F##",7},{"Fbb",3},{"F#",6},{"Fb",4},{"F♯",6},{"F♭",4},{"F♯♯",7},{"F♭♭",3},{"F",5},{"G##",9},{"Gbb",5},{"G#",8},{"Gb",6},{"G♯",8},{"G♭",6},{"G♯♯",9},{"G♭♭",5},{"G",7},{"A##",11},{"Abb",7},{"A#",10},{"Ab",8},{"A♯",10},{"A♭",8},{"A♯♯",11},{"A♭♭",7},{"A",9},{"B##",13},{"Bbb",9},{"B#",12},{"Bb",10},{"B♯",12},{"B♭",10},{"B♯♯",13},{"B♭♭",9},{"B",11}
     };
 
 	// Converts a note name and octave to a voltage based on Eurorack 1V/oct standard
@@ -286,15 +290,15 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 				cell.erase(std::remove_if(cell.begin(), cell.end(), ::isspace), cell.end());  // Clean cell from spaces
 				
 				if (!cell.empty()) {
-					if (cell == "G" || cell == "|") {
-						stepData[index].voltage = 10.0f;  // Treat 'X' as a gate signal (10 volts)
-						stepData[index].type = 'G';  // Gate
+					if (cell == "W" || cell == "|") {
+						stepData[index].voltage = 10.0f;
+						stepData[index].type = 'G';  // Full Width Gate (stay 10v the entire step)
 					} else if (cell == "T" || cell == "^") {
 						stepData[index].voltage = 10.0f;
-						stepData[index].type = 'T';  // 1ms Trigger signal
+						stepData[index].type = 'T';  // Trigger (1ms pulse)
 					} else if (cell == "X" || cell == "R" || cell == "_") {
 						stepData[index].voltage = 10.0f;
-						stepData[index].type = 'R';  // Retrigger signal (0.0v for 1ms at start of step)
+						stepData[index].type = 'R';  // Gate with Retrigger (0v for 1ms at start of step, then 10v after)
 					} else {
 						stepData[index].voltage = parsePitch(cell);
 						stepData[index].type = 'N';
@@ -332,41 +336,59 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 			parseText();  // Reparse the text into steps
 			dirty = false;
 		}
+		
+		if (params[TOGGLE_SWITCH].getValue() > 0) { 
+			configInput(INDEX_INPUT, "Index (Absolute address, 1v/step)");
+		} else {
+			configInput(INDEX_INPUT, "Index (Relative / Phasor-like)");
+		}
 
 		if (steps.empty()) return;  // If still empty after parsing, skip processing
 		
+		int stepCount = steps.size();
+		int lastStep = currentStep;
+		
 		if (!inputs[INDEX_INPUT].isConnected() && !resetHigh && !ignoreClock && !steps.empty()) {
-			if (clockTrigger.process(inputs[CLOCK_INPUT].getVoltage())) {
-				currentStep = (currentStep + 1) % steps.size();
+			// Forward step
+			if (stepForwardTrigger.process(inputs[STEPFWD_INPUT].getVoltage())) {
+				currentStep = (currentStep + 1) % stepCount;
 				triggerTimer.reset();
 			}
+			
+			// Backward step
+			if (stepBackTrigger.process(inputs[STEPBAK_INPUT].getVoltage())) {
+				currentStep = (currentStep - 1 + stepCount) % stepCount;
+				triggerTimer.reset();
+			}
+			
 		} else if (inputs[INDEX_INPUT].isConnected()) {
 			float indexVoltage = inputs[INDEX_INPUT].getVoltage();
-			int numSteps = steps.size();
-			int lastStep = currentStep;
+			//int numSteps = steps.size();
 			if (params[TOGGLE_SWITCH].getValue() > 0) { 
-				currentStep = clamp((int)indexVoltage % numSteps,0,numSteps-1); // Absolute mode (alt)
+				currentStep = clamp((int)indexVoltage % stepCount,0,stepCount-1); // Absolute mode (alt)
+				//configInput(INDEX_INPUT, "Index (Absolute address, 1v/step)");
 			} else {
 				float percentage = indexVoltage/10.f; // Treat 10.v as "1.0" for "100%"
 				
-				float unboundedIndex = percentage * numSteps; // Get the index that is <percentage> through the array
+				float unboundedIndex = percentage * stepCount; // Get the index that is <percentage> through the array
 				
 				//unboundedIndex -= 0.0001f;
 				
-				int targetIndex = (int)unboundedIndex % numSteps;
+				int targetIndex = (int)unboundedIndex % stepCount;
 				
-				if (targetIndex==0 && std::fabs(unboundedIndex)>1) targetIndex=numSteps;
+				if (targetIndex==0 && std::fabs(unboundedIndex)>1) targetIndex=stepCount;
 				
-				if (targetIndex < 0) targetIndex+=numSteps;
+				if (targetIndex < 0) targetIndex+=stepCount;
 
-				currentStep = clamp(targetIndex, 0, numSteps-1); // Relative mode (default)
+				currentStep = clamp(targetIndex, 0, stepCount-1); // Relative mode (default)
+				//configInput(INDEX_INPUT, "Index (Relative / Phasor-like)");
 			}
 			if (currentStep != lastStep) {
 				triggerTimer.reset();
 			}
 		}
 		
-		float rowCount = (float)steps.size();
+		float rowCount = (float)stepCount;
 		float relativeIndex = currentStep / (rowCount-1) * 10.f;
 		float absoluteIndex = (float)currentStep + 1.f;
 		outputs[RELATIVE_OUTPUT].setVoltage( relativeIndex );
@@ -515,12 +537,12 @@ struct SpellbookTextField : LedDisplayTextField {
 		}
 
 		// Slightly oversized box so we can draw a bordered backdrop for the textfield
-		nvgScissor(args.vg, args.clipBox.pos.x-1, args.clipBox.pos.y-1, args.clipBox.size.x+2, args.clipBox.size.y+2);
+		nvgScissor(args.vg, args.clipBox.pos.x-2, args.clipBox.pos.y-2, args.clipBox.size.x+4, args.clipBox.size.y+4);
 		
 		// Textfield backdrop
 		nvgBeginPath(args.vg);
 		nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 200));
-		nvgRect(args.vg, -1, -1, box.size.x+2, box.size.y+2);
+		nvgRect(args.vg, -2, -2, box.size.x+4, box.size.y+4);
 		nvgFill(args.vg);
 		nvgStrokeColor(args.vg, textColor);  // White color with full opacity
 		nvgStrokeWidth(args.vg, 1.0);  // Set the width of the stroke
@@ -606,15 +628,15 @@ struct SpellbookTextField : LedDisplayTextField {
 		while (std::getline(lines, line)) {
 			nvgFontSize(args.vg, lineHeight);  // Brute force match lineHeight
 			
-			if (y + lineHeight < 0) {
+			if (y + lineHeight < 0) { // +lineHeight lets it draw one extra line, for bleed
 				y += lineHeight;
 				currentPos += line.size() + 1;
-				lineIndex++;
+				lineIndex++; // Only increment if not a `??` comment row? Would that work? This seems to only be used to determine what Step we're on, not wheere we're drawing
 				continue;
 			}
 			
 			if (y > box.size.y+lineHeight*2) {
-				break; // Stop once we've drawn two extra lines.
+				break; // Stop once we've drawn two extra lines, for bleed
 			}
 			
 			// Use brighter color if current step and defocused (playing)
@@ -679,10 +701,9 @@ struct SpellbookTextField : LedDisplayTextField {
 			}
 			//float stepSize = std::min(lineHeight,14.f);
 			//float centerOffset = stepSize / lineHeight;
-			float stepSize = std::min(lineHeight,14.f);
-			float stepY = 0 + (lineHeight - stepSize)*0.5;
-			nvgFontSize(args.vg, stepSize);  // step numbers max out at a smaller size or it looks bad
-			//TODO: make littler labels center to their bigger row 
+			float stepSize = std::min(lineHeight,14.f); // step numbers max out at a smaller size or it looks bad
+			float stepY = 0 + (lineHeight - stepSize)*0.5; // center them to their row, looks better when they're smaller
+			nvgFontSize(args.vg, stepSize); 
 			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL); // This ends up averaging their widths to get back to monospace
 			float stepX = -stepTextWidth - 2;  // Right-align in gutter, with constant padding
 			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(158, 80, 191) : nvgRGB(155, 131, 0));  // Current step in purple, others in gold
@@ -766,6 +787,17 @@ struct SpellbookTextField : LedDisplayTextField {
 		LedDisplayTextField::onDeselect(e);
 	}
 	
+	void startParse() {
+		if (module) {
+			std::string priorText = module->text;
+			cleanAndPublishText();
+			if (text != priorText) {
+				// Push an undo action if we made a real change (post cleaning)
+				APP->history->push( new SpellbookUndoRedoAction(module->id, priorText, text) );
+			}
+		}
+	}
+	
 	void onSelect(const SelectEvent& e) override {
 		focused = true;
 		// Ensure cursor is not out of bounds
@@ -783,6 +815,7 @@ struct SpellbookTextField : LedDisplayTextField {
 		
 		if (module) {
 			module->text = cleanedText;
+			module->parseText();
 			module->dirty = true;
 		}
 		setText(cleanedText);  // Make sure to update the text within this widget too
@@ -908,28 +941,34 @@ struct SpellbookTextField : LedDisplayTextField {
 	}
 	
 	void onSelectKey(const SelectKeyEvent& e) override {
-		clampCursor();
+		clampCursor(); // Safety rail, probably not needed
 		if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
 			if (e.key == GLFW_KEY_ENTER) {
-				std::string text = getText();
-				std::string beforeCursor = text.substr(0, cursor);
-				std::string afterCursor = text.substr(cursor);
-				setText(beforeCursor + "\n" + afterCursor);
-				// Trailing blank lines get trimmed away unless you add a 0 or a comma or something,
-				// but not sure what an intuitive way to convey and/or avoid that would be
-				
-				cursor = beforeCursor.length() + 1;  // Set cursor right after the new line
-				
-				clampCursor();
-				
-				selection = cursor;  // Reset selection to cursor position
-				module->dirty = true;
-				
-				// Recalculate text box scrolling
-				updateSizeAndOffset();
-				
-				e.consume(this);
-				return;
+				if ((e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
+					startParse();
+					e.consume(this);
+					return;
+				} else {
+					std::string text = getText();
+					std::string beforeCursor = text.substr(0, cursor);
+					std::string afterCursor = text.substr(cursor);
+					setText(beforeCursor + "\n" + afterCursor);
+					// Trailing blank lines get trimmed away unless you add a 0 or a comma or something,
+					// but not sure what an intuitive way to convey and/or avoid that would be
+					
+					cursor = beforeCursor.length() + 1;  // Set cursor right after the new line
+					
+					clampCursor();
+					
+					selection = cursor;  // Reset selection to cursor position
+					module->dirty = true;
+					
+					// Recalculate text box scrolling
+					//updateSizeAndOffset();
+					
+					e.consume(this);
+					return;
+				}
 			} else if (e.key == GLFW_KEY_UP || e.key == GLFW_KEY_DOWN) {
 				std::string text = getText();
 				std::vector<int> lineBreaks = {-1};  // Start before the first line
@@ -959,18 +998,19 @@ struct SpellbookTextField : LedDisplayTextField {
 				if (!(e.mods & GLFW_MOD_SHIFT)) {
 					selection = cursor;
 				}
-				updateSizeAndOffset();  // Always update size and offset after moving cursor
-				e.consume(this);
+								e.consume(this);
 				return;
 			} else if (e.keyName == "]" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
 				resizeText(1);
 			} else if (e.keyName == "[" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
 				resizeText(-1);
 			}
+			
 		}
-		clampCursor();
+		clampCursor(); // Safety rail, probably not needed
 		LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
 		clampCursor();
+		updateSizeAndOffset();  // Validate size and offset after any keypress
 		scrollToCursor(); // Scroll to the cursor after any keypress
 	}
 	
@@ -995,7 +1035,8 @@ struct SpellbookWidget : ModuleWidget {
 		// GRID_SNAP gives us a 10.16mm grid.
 		// GRID_SNAP is derived from RACK_GRID_WIDTH, which is 1hp. One GRID_SNAP is 2hp in milimeters, because 2hp is just right for port spacing.
 		// Module is 48hp wide, with 4hp of space on the left side and and right sides for ports
-		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*1.5)), module, Spellbook::CLOCK_INPUT));
+		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1.5, GRID_SNAP*1.5)), module, Spellbook::STEPFWD_INPUT));
+		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*0.75, GRID_SNAP*1.5)), module, Spellbook::STEPBAK_INPUT));
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*3.0)), module, Spellbook::RESET_INPUT));
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*4.5)), module, Spellbook::INDEX_INPUT));
 		

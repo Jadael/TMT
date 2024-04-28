@@ -191,6 +191,38 @@ Watch a brief demonstration here:
 
 ---
 
+# Stats
+
+![Stats](screenshots/stats.png)
+
+Stats is a statistical function module for VCV Rack. It computes and outputs various statistical metrics from the signals of a polyphonic input cable.
+
+## Inputs & Outputs
+
+- **Polyphonic Input**: Receives the polyphonic signals to analyze.
+
+- **Mean Output**: Outputs the average voltage of the input signals.
+- **Median Output**: Outputs the median voltage.
+- **Mode Output**: Outputs the most frequent voltage(s) as a polyphonic signals.
+	- If multiple modes are found, it lists all of them as a polyphonic signal.
+	- If no modes are found, outputs 0.
+- **Geometric Mean Output**: Outputs the geometric mean of the input voltages.
+- **Product Output**: Outputs the product of all input voltages.
+	- !!! WARNING !!! THis can produced extremely large voltages (e.g. quickly rises to greater than a million volts ), think about safety precautions!
+- **Count Output**: Outputs the number of active channels in the input as an integer voltage.
+	- !!! WARNING !!! The output range for this port is 0.0v to 16.0v.
+- **Sum Output**: Outputs the sum of all input voltages.
+- **Ascending Output**: Outputs the input voltages sorted in ascending order.
+- **Distinct Output**: Outputs one of each distinct voltage from the input, ignoring very close values (+/- 0.0001v) as not distinct.
+
+- **Toggle Audio Rate**: By default, Stats runs at step rate (~10-60hz). Toggle this to run at audio rate, which is pretty CPU heavy.
+
+## Usage
+
+Connect a polyphonic signal to the Polyphonic Input and patch the desired outputs to other modules for further manipulation or monitoring. The Stats module can be especially useful for generating control voltages based on statistical properties of a signal, or for diagnosing and analyzing signal behaviors within a patch.
+
+---
+
 ## License
 
 This project is licensed under the MIT License. See the [license.txt](license.txt) file for more information.
