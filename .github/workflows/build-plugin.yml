@@ -93,63 +93,63 @@ jobs:
           path: dist/*.vcvplugin
           name: mac-${{ matrix.platform }}
 
-publish:
-  name: Publish plugin
-  runs-on: ubuntu-latest
-  needs: [build, build-mac]
-  # Trigger this job only on pushes to the main branch.
-  if: github.ref == 'refs/heads/main'
-  steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0  # Fetch all history for all tags and branches
+    publish:
+      name: Publish plugin
+      runs-on: ubuntu-latest
+      needs: [build, build-mac]
+      # Trigger this job only on pushes to the main branch.
+      if: github.ref == 'refs/heads/main'
+      steps:
+        - uses: actions/checkout@v3
+          with:
+            fetch-depth: 0  # Fetch all history for all tags and branches
 
-    - name: Setup jq
-      run: sudo apt-get install jq
+        - name: Setup jq
+          run: sudo apt-get install jq
 
-    - name: Check if new version is tagged
-      id: check-version
-      run: |
-        pluginversion=`jq -r '.version' plugin.json`
-        echo "Plugin version: $pluginversion"
-        git fetch --tags
-        if git rev-parse "v$pluginversion" >/dev/null 2>&1; then
-          echo "::set-output name=tag_exists::true"
-          echo "Tag v$pluginversion already exists"
-        else
-          echo "::set-output name=tag_exists::false"
-          echo "No existing tag for version v$pluginversion, proceeding to create one"
-    
-    - name: Create tag
-      if: steps.check-version.outputs.tag_exists == 'false'
-      run: |
-        pluginversion=`jq -r '.version' plugin.json`
-        git tag -a "v$pluginversion" -m "Release version v$pluginversion"
-        git push origin "v$pluginversion"
-    
-    - name: Create Release
-      if: steps.check-version.outputs.tag_exists == 'false'
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        body: |
-          ${{ env.GITHUB_REPOSITORY_NAME }} VCV Rack Plugin ${{ github.ref }}
-        draft: false
-        prerelease: false
+        - name: Check if new version is tagged
+          id: check-version
+          run: |
+            pluginversion=`jq -r '.version' plugin.json`
+            echo "Plugin version: $pluginversion"
+            git fetch --tags
+            if git rev-parse "v$pluginversion" >/dev/null 2>&1; then
+              echo "::set-output name=tag_exists::true"
+              echo "Tag v$pluginversion already exists"
+            else
+              echo "::set-output name=tag_exists::false"
+              echo "No existing tag for version v$pluginversion, proceeding to create one"
+        
+        - name: Create tag
+          if: steps.check-version.outputs.tag_exists == 'false'
+          run: |
+            pluginversion=`jq -r '.version' plugin.json`
+            git tag -a "v$pluginversion" -m "Release version v$pluginversion"
+            git push origin "v$pluginversion"
+        
+        - name: Create Release
+          if: steps.check-version.outputs.tag_exists == 'false'
+          uses: actions/create-release@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            tag_name: ${{ github.ref }}
+            release_name: Release ${{ github.ref }}
+            body: |
+              ${{ env.GITHUB_REPOSITORY_NAME }} VCV Rack Plugin ${{ github.ref }}
+            draft: false
+            prerelease: false
 
-    - uses: actions/download-artifact@v2
-      if: steps.check-version.outputs.tag_exists == 'false'
-      with:
-        path: _artifacts
+        - uses: actions/download-artifact@v2
+          if: steps.check-version.outputs.tag_exists == 'false'
+          with:
+            path: _artifacts
 
-    - name: Upload release assets
-      if: steps.check-version.outputs.tag_exists == 'false'
-      uses: svenstaro/upload-release-action@v2
-      with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: _artifacts/**/*.vcvplugin
-        tag: ${{ github.ref }}
-        file_glob: true
+        - name: Upload release assets
+          if: steps.check-version.outputs.tag_exists == 'false'
+          uses: svenstaro/upload-release-action@v2
+          with:
+            repo_token: ${{ secrets.GITHUB_TOKEN }}
+            file: _artifacts/**/*.vcvplugin
+            tag: ${{ github.ref }}
+            file_glob: true
