@@ -134,9 +134,11 @@ Spellbook is a module to sequence pitch and control voltage (CV) patterns in a e
 
 ## Inputs & Outputs
 
-- **Clock Input**: Advances to the next step in the sequence on the rising edge of each clock signal.
+- **Step Forward**: Advances to the next step in the sequence on the rising edge of a trigger.
+- **Step Backward**: Advances to the prior step in the sequence on the rising edge of a trigger.
 - **Reset Input**: Resets the sequence to the first step on the rising edge of the input signal.
 - **Index Input**: Set the current step to a specific index, where 0v is the first step through to 10v for the last step, like a Phasor
+
 - **Index Mode Toggle**: Toggle the Index to "absolute address" mode, where 1v is step one, 2v is step two, etc.
 
 - **Poly Out**: Outputs all 16 voltages as a polyphonic signal.
