@@ -18,8 +18,8 @@ jobs:
     name: Modify plugin version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         id: plugin-version-cache
         with:
           path: plugin.json
@@ -42,8 +42,8 @@ jobs:
       matrix:
         platform: [win-x64, lin-x64]
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         id: plugin-version-cache
         with:
           path: plugin.json
@@ -68,8 +68,8 @@ jobs:
       matrix:
         platform: [x64, arm64]
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         id: plugin-version-cache
         with:
           path: plugin.json
@@ -97,7 +97,7 @@ jobs:
     name: Prepare Tags
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check and Create Tag
         run: |
           pluginversion=`jq -r '.version' plugin.json`
@@ -115,7 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, build-mac, prepare-tags]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check and potentially create tag
         run: |
           pluginversion=`jq -r '.version' plugin.json`
@@ -127,7 +127,7 @@ jobs:
             git push origin "v$pluginversion"
           fi
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: _artifacts
       - name: Create Release and Upload Assets
@@ -149,7 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, build-mac]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Ensure Nightly Tag Exists
         run: |
           tag_exists=$(git tag -l "Nightly")
