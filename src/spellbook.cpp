@@ -103,7 +103,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
         configInput(STEPFWD_INPUT, "Step Forward");
 		configInput(STEPBAK_INPUT, "Step Backward");
         configInput(RESET_INPUT, "Reset");
-		configInput(INDEX_INPUT, "Index (Relative / Phasor-like)");
+		configInput(INDEX_INPUT, "Index");
         configOutput(POLY_OUTPUT, "16 voltages from columns"); // This poly output will always be exactly 16 channels.
 		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Toggle relative / absolute indexing");
 		configOutput(RELATIVE_OUTPUT, "Relative Index");
@@ -337,12 +337,6 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 			dirty = false;
 		}
 		
-		if (params[TOGGLE_SWITCH].getValue() > 0) { 
-			configInput(INDEX_INPUT, "Index (Absolute address, 1v/step)");
-		} else {
-			configInput(INDEX_INPUT, "Index (Relative / Phasor-like)");
-		}
-
 		if (steps.empty()) return;  // If still empty after parsing, skip processing
 		
 		int stepCount = steps.size();
@@ -815,7 +809,6 @@ struct SpellbookTextField : LedDisplayTextField {
 		
 		if (module) {
 			module->text = cleanedText;
-			module->parseText();
 			module->dirty = true;
 		}
 		setText(cleanedText);  // Make sure to update the text within this widget too
