@@ -93,89 +93,41 @@ jobs:
           path: dist/*.vcvplugin
           name: mac-${{ matrix.platform }}
 
-  prepare-tags:
-    name: Prepare Tags
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check and Create Tag
-        run: |
-          pluginversion=`jq -r '.version' plugin.json`
-          tag_exists=$(git tag -l "v$pluginversion")
-          if [ -z "$tag_exists" ]; then
-            git config user.name github-actions
-            git config user.email github-actions@github.com
-            git tag "v$pluginversion"
-            git push origin "v$pluginversion"
-          fi
-
   publish:
     name: Publish plugin
-    if: github.ref == 'refs/heads/main'
+    # only create a release if a tag was created that is called e.g. v1.2.3
+    # see also https://vcvrack.com/manual/Manifest#version
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    needs: [build, build-mac, prepare-tags]
+    needs:  [build, build-mac]
     steps:
-      - uses: actions/checkout@v4
-      - name: Check and potentially create tag
+      - uses: actions/checkout@v3
+      - uses: FranzDiebold/github-env-vars-action@v1.2.1
+      - name: Check if plugin version matches tag
         run: |
           pluginversion=`jq -r '.version' plugin.json`
-          tag_exists=$(git tag -l "v$pluginversion")
-          if [ -z "$tag_exists" ]; then
-            git config user.name github-actions
-            git config user.email github-actions@github.com
-            git tag "v$pluginversion"
-            git push origin "v$pluginversion"
+          if [ "v$pluginversion" != "${{ env.GITHUB_REF_NAME }}" ]; then
+            echo "Plugin version from plugin.json 'v$pluginversion' doesn't match with tag version '${{ env.GITHUB_REF_NAME }}'"
+            exit 1
           fi
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path: _artifacts
-      - name: Create Release and Upload Assets
-        if: env.TAG_CREATED == 'true'
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: "v$pluginversion"
-          name: Release "v$pluginversion"
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
           body: |
-            ${{ env.CI_REPOSITORY_NAME }} VCV Rack Plugin v$pluginversion
+            ${{ env.GITHUB_REPOSITORY_NAME }} VCV Rack Plugin ${{ env.GITHUB_REF_NAME }}
           draft: false
           prerelease: false
-          files: _artifacts/**/*.vcvplugin
-          file_glob: true
-
-  publish-nightly:
-    name: Publish nightly
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    needs: [build, build-mac]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Ensure Nightly Tag Exists
-        run: |
-          tag_exists=$(git tag -l "Nightly")
-          if [ -z "$tag_exists" ]; then
-            git config user.name github-actions
-            git config user.email github-actions@github.com
-            git tag Nightly
-            git push origin Nightly
-          fi
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v2
         with:
           path: _artifacts
-      - name: Delete old Nightly release if exists
-        uses: dev-drprasad/delete-older-releases@v0.1.0
+      - name: Upload release assets
+        uses: svenstaro/upload-release-action@v2
         with:
-          keep_latest: 1
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: Nightly
-      - name: Create or update Nightly release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: Nightly
-          name: Nightly Build
-          body: Nightly build of ${{ env.CI_REPOSITORY_NAME }}
-          draft: false
-          prerelease: true
-          files: _artifacts/**/*.vcvplugin
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: _artifacts/**/*.vcvplugin
+          tag: ${{ github.ref }}
           file_glob: true
-          allow_updates: true
