@@ -93,6 +93,22 @@ jobs:
           path: dist/*.vcvplugin
           name: mac-${{ matrix.platform }}
 
+  prepare-tags:
+    name: Prepare Tags
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check and Create Tag
+        run: |
+          pluginversion=`jq -r '.version' plugin.json`
+          tag_exists=$(git tag -l "v$pluginversion")
+          if [ -z "$tag_exists" ]; then
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            git tag "v$pluginversion"
+            git push origin "v$pluginversion"
+          fi
+
   publish:
     name: Publish plugin
     if: github.ref == 'refs/heads/main'
