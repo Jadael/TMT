@@ -44,13 +44,25 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
    - *Decimals are allowed*
    - *Semitones are numbered relative to C4, which means they are basically the same as MIDI Notes except 0 = C4*
 
-6. **Percentages**
+6. **Cents**
+   - Format: `<Number>ct`
+   - Example: `0ct`, `7ct`, `-12ct`
+   - *Decimals are allowed*
+   - *Cents relative to C4*
+
+7. **Hertz**
+   - Format: `<Number>Hz`
+   - Example: `440Hz`, `32Hz`, `1Hz`
+   - *Decimals are allowed*
+   - *0 or less is undefined, and will output 0 volts*
+
+8. **Percentages**
    - Format: `<Number>%`
    - Example: `50%`, `100%`, `-12.5%`
    - Numbers ending in % are divided by 10, so that 100% becomes 10.0v, -50% becomes -5.0v, etc.
    - *This scaling is specific to eurorack. If you are implementing RhythML in another environment, percentages should be translated according to the standards of that environment. For example, if you were parsing RhythML into MIDI, 0%-100% might become 0-127.*
 
-7. **Empty Cells**:
+9. **Empty Cells**:
    - An empty cell or a cell containing only whitespace or comments will leave the output's current voltage as-is, unless that "current voltage" was from a gate, trigger, or retrigger, in which case it reverts to 0.0.
 
 > Note that unlike MIDI or a Tracker, a single cell with a pitch in it does not automatically generate anything like a gate or a "note on", it just outputs one voltage to one output, like a CV sequencer. You would need to sequence the rhythm using voltages/gates/triggers/retriggers in another column, or get rhythm from another source like your clock. Remember, any column can be for used for anything you need a voltage for: pitches, gates, velocity, CVs, etc. Think modular!
