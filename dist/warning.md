@@ -1,1 +1,0 @@
-You probably want to check [Releases](https://github.com/Jadael/TMT/releases) instead of this, but this will always be the newest dev build for Windows as I work on things.

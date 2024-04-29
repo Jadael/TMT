@@ -151,11 +151,19 @@ Spellbook is a module to sequence pitch and control voltage (CV) patterns in a e
 Spellbook sequences are programmed using the RhythML format, a syntax to define pitch and CV patterns in plain text. Each line in the text input represents a sequence step, triggered sequentially by the clock input. Columns in the text represent the 16 outputs, allowing for complex configurations across multiple hardware modules.
 
 ### RhythML Features
+**Voltages and Gates**
 - **Decimal Voltages**: Directly specify voltage outputs by writing decimal numbers.
-- **Gate and Trigger Commands**: Use `X` for a gate-with-retrigger (guarantees a rising edge), `T` for a 1ms trigger pulse (guarantees a rising edge), or `W` for a full-width gate (no rising edge); as shorthand for rhythmic sequences.
-- **Scientific Pitch Names**: Specify pitches using standard note names (e.g., `C4`, `G#3`), and they are parsed to 1V/oct standard.
-- **MIDI numbers** and **Semitones**, prefixed with `M` or `S` (e.g. `m60` or `s7`). Decimals are allowed.
-- **Percentages**: Numbers ending in `%` (e.g. `50%` or `12.5%`), which are converted so that 100% = 10.0v.
+- **Percentages**: Numbers ending in `%` (e.g. `50%` or `12.5%`), are translated so that 0% = 0.0v and 100% = 10.0v.
+- **Gate and Trigger Commands**: Use `X` or `_` for a gate-with-retrigger (guarantees a rising edge), `T` or `^` for a 1ms trigger pulse (guarantees a rising edge), and `W` or `|` for a full-width gate (no rising edge); as shorthand for rhythmic sequences.
+
+**Pitch Representations**
+These are all parsed and translated into 1v/Octave. Decimals are allowed for all of them, but microtones may not be supported by all things you send those signals to.
+- **Scientific Pitch Names**: Specify pitches using standard note names (e.g., `C4`, `G#3`).
+- **MIDI numbers**: Numbers prefixed with `m` (e.g. `m60`) are parsed as MIDI note numbers. 60 = C4.
+- **Semitones**: Numbers prefixed with `S` (e.g. `s7`) are parsed as semitones relative to C4.
+- **Cents**: Numbers ending with `ct` are parsed as cents relative to C4.
+- **Hertz**: Numbers ending with `Hz` are parsed as frequencies.
+
 
 Refer to [RhythML Syntax Specification](RhythML.md) for comprehensive guidelines on writing sequences for Spellbook.
 
@@ -165,27 +173,27 @@ Here's a simple RhythML sequence to get started:
 
 ```
 E4 ? Pitch, X ? Gate, 100% ? Velocity
-C5        , T       , 80%
-D5        , T       , 60%
-B4        , T       , 50%
+C5        , X       , 80%
+D5        , X       , 60%
+B4        , X       , 50%
 ```
 
-In this example, each step sets a pitch in column 1, uses column 2 for gating, and controls a velocity CV in column 3. The sequence plays a C major arpeggio, holding the first note for a full beat, and gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored because of the `?`.
+In this example, each step sets a pitch in column one, uses column two for gating, and controls a velocity CV in column three. The sequence plays a C major arpeggio, gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored because of the `?`.
 
 Here's the same arpeggio, but with a little more rhythmic variation:
 
 ```
 E4 ? Pitch, X ? Gate, 100% ? Velocity
-          , X       , 
-          , X       , 
-C5        , R       , 80%
-D5        , R       , 60%
+          , |       , 
+          , |       , 
+C5        , X       , 80%
+D5        , X       , 60%
           ,         , 
 B4        , X       , 50%
           ,         , 
 ```
 
-Notice the way this pattern holds notes by using consecutive gates over several steps, using Retriggers to ensure a new rising edge after a prior gate.
+Notice the way this pattern holds notes by using consecutive gates over several steps, using Retriggers to ensure a new rising edge when the step begins (even after a full width gate). The first note is held for three steps.
 
 Watch a brief demonstration here:
 
@@ -193,13 +201,15 @@ Watch a brief demonstration here:
 
 ---
 
-# Stats
+# Stats (PREVIEW)
 
 ![Stats](screenshots/stats.png)
 
-Stats is a statistical function module for VCV Rack. It computes and outputs various statistical metrics from the signals of a polyphonic input cable.
+Stats is a statistical function module for VCV Rack. It computes and outputs various statistical metrics from the signals of a polyphonic input cable. Stats is not yet in the VCV Rack Library version of this plugin; check [Releases](https://github.com/Jadael/TMT/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
 
 ## Inputs & Outputs
+
+- **Toggle Audio Rate**: By default, Stats runs at step rate (~10-60hz). Toggle this to run at audio rate, which is pretty CPU heavy.
 
 - **Polyphonic Input**: Receives the polyphonic signals to analyze.
 
@@ -216,12 +226,6 @@ Stats is a statistical function module for VCV Rack. It computes and outputs var
 - **Sum Output**: Outputs the sum of all input voltages.
 - **Ascending Output**: Outputs the input voltages sorted in ascending order.
 - **Distinct Output**: Outputs one of each distinct voltage from the input, ignoring very close values (+/- 0.0001v) as not distinct.
-
-- **Toggle Audio Rate**: By default, Stats runs at step rate (~10-60hz). Toggle this to run at audio rate, which is pretty CPU heavy.
-
-## Usage
-
-Connect a polyphonic signal to the Polyphonic Input and patch the desired outputs to other modules for further manipulation or monitoring. The Stats module can be especially useful for generating control voltages based on statistical properties of a signal, or for diagnosing and analyzing signal behaviors within a patch.
 
 ---
 

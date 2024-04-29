@@ -77,7 +77,7 @@ struct Spellbook : Module {
 	// Default text is a little tutorial
 	std::string text = R"~(0 ? Decimal                                         , T ? Trigger
 1.0 ? text after ? is ignored (for comments)!       , X ? Gate with retrigger
--1 ? row 1 comments become output labels            , G ? Full width gate
+-1 ? row 1 comments become output labels            , W ? Full width gate
 1 ? (sorry no row 0 / header row... yet!)                  , | ? alternate full width gate
                                                     , |
 ? Empty cells don't change the output...            , ? ...except after gates/triggers
@@ -201,6 +201,21 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		return 0.0f;  // Return 0.0 volts if the noteName is not found (optional: handle this case more gracefully)
 	}
 	
+	// Scale Hertz to 1v/Octave
+	float frequencyToVoltage(float frequency) {
+		return std::log2(frequency / 261.63f);  // Converts Hz to 1V/oct standard with C4 = 261.63 Hz
+	}
+
+	// Scale Cents to 1v/Octave
+	float parseCents(const std::string& centsPart) {
+		try {
+			float cents = std::stof(centsPart);
+			return cents / 1200.0f;  // Convert cents to 1V/oct relative to C4
+		} catch (...) {
+			return 0.0f;  // Return default voltage if parsing fails
+		}
+	}
+	
 	// Parses pitch from a cell with various formats
 	float parsePitch(const std::string& cell) {
 		if (cell.empty()) {
@@ -232,6 +247,25 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 			try {
 				float percentage = std::stof(cell.substr(0, cell.size() - 1));
 				return percentage / 10.0f;  // Convert percentage to voltage
+			} catch (...) {
+				return 0.0f;  // Return default voltage if parsing fails
+			}
+		}
+		
+		// Hz format parsing
+		if (cell.find("HZ") != std::string::npos) {
+			try {
+				float frequency = std::stof(cell.substr(0, cell.find("HZ")));
+				return frequencyToVoltage(frequency);  // Convert frequency directly to voltage
+			} catch (...) {
+				return 0.0f;  // Return default voltage if parsing fails
+			}
+		}
+
+		// Cents notation parsing
+		if (cell.find("CT") != std::string::npos) {
+			try {
+				return parseCents(cell.substr(0, cell.find("CT")));
 			} catch (...) {
 				return 0.0f;  // Return default voltage if parsing fails
 			}

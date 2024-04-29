@@ -1,7 +1,7 @@
 {
   "plugin": "TMT",
   "model": "Spellbook",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "params": [
     {
       "value": 0.0,
@@ -9,7 +9,7 @@
     }
   ],
   "data": {
-    "text": "0 ? Decimal                                         , T ? Trigger                        , \n1.0 ? text after ? is ignored (for comments)!       , X ? Gate with retrigger            , \n-1 ? row 1 comments become output labels            , G ? Full width gate                , \n1 ? (sorry                                          , no row 0 comments yet)             , | ? alternate full width gate\n                                                    , |                                  , \n? Empty cells don't change the output...            , ? ...except after gates/triggers   , \n                                                    ,                                    , \nC4 ? Also parses note names like `C4` to 1v/oct...  , X                                  , \nC ? (octave 4 is the default if left out)           , X                                  , \nm60 ? ...or MIDI note numbers like `m60`...         , X                                  , \ns7 ? ...or semitones from C4 like `s7`.             , X                                  , \n10% ? ...or percentages! (useful for velocity)      , X                                  , \n? Important !!! This is not a Tracker !!!           ,                                    , \nC4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger column     , \n                                                    , X ? or triggers from somewhere else, \n? Or use columns for ANY CV                         , | ? Think modular!                 , ",
+    "text": "0 ? Decimal                                         , T ? Trigger\n1.0 ? text after ? is ignored (for comments)!       , X ? Gate with retrigger\n-1 ? row 1 comments become output labels            , W ? Full width gate\n1 ? (sorry no row 0 / header row... yet!)           , | ? alternate full width gate\n                                                    , |\n? Empty cells don't change the output...            , ? ...except after gates/triggers\n                                                    , \nC4 ? Also parses note names like `C4` to 1v/oct...  , X\nC ? (octave 4 is the default if left out)           , X\nm60 ? ...or MIDI note numbers like `m60`...         , X\ns7 ? ...or semitones from C4 like `s7`.             , X\n10% ? ...or percentages! (useful for velocity)      , X\n? Important !!! This is not a Tracker !!!           , \nC4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger column\n                                                    , X ? or triggers from somewhere else\n? Or use columns for ANY CV                         , | ? Think modular!",
     "lineHeight": 12.0
   }
 }
