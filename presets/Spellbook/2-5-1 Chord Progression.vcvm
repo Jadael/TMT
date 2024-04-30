@@ -9,7 +9,6 @@
     }
   ],
   "data": {
-    "text": "D3 ? Root, F4 ? Third, A4 ? Fifth, X ? Downbeat, ? Upbeat, T ?ChordChange\n         ,           ,           ,             , X       , \nG4       , B5        , D4        , X           ,         , T\n         ,           ,           ,             , X       , \nC4       , E5        , G4        , X           ,         , T\n         ,           ,           ,             , X       , \n         ,           ,           , X           ,         , \n         ,           ,           ,             , X       , ",
-    "lineHeight": 12.0
+    "text": "D3 ? Root, F4 ? Third, A4 ? Fifth, X ? Downbeat, ? Upbeat, T ?ChordChange\n         ,           ,           ,             , X       , \nG4       , B5        , D4        , X           ,         , T\n         ,           ,           ,             , X       , \nC4       , E5        , G4        , X           ,         , T\n         ,           ,           ,             , X       , \n         ,           ,           , X           ,         , \n         ,           ,           ,             , X       , "
   }
 }

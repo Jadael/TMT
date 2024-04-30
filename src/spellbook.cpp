@@ -8,6 +8,9 @@
 #define GRID_SNAP 10.16 // 10.16mm grid for placing components
 #define SPELLBOOK_DEFAULT_WIDTH 48
 #define SPELLBOOK_MIN_WIDTH 18
+#define SPELLBOOK_MAX_WIDTH 96
+#define SPELLBOOK_MIN_LINEHEIGHT 4.0f
+#define SPELLBOOK_MAX_LINEHEIGHT 128.0f
 
 struct StepData {
     float voltage;
@@ -144,9 +147,14 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		if (textJ)
 			text = json_string_value(textJ);
 		
+		json_t* lineHeightJ = json_object_get(rootJ, "lineHeight");
+		if (lineHeightJ) {
+			lineHeight = clamp(json_number_value(lineHeightJ),SPELLBOOK_MIN_LINEHEIGHT,SPELLBOOK_MAX_LINEHEIGHT);
+		}
+		
 		json_t* widthJ = json_object_get(rootJ, "width");
 		if (widthJ) {
-			width = json_number_value(widthJ);
+			width = clamp(json_number_value(widthJ),SPELLBOOK_MIN_WIDTH,SPELLBOOK_MAX_WIDTH); 
 		}
 		
 		dirty = true;
@@ -168,12 +176,13 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		
 		// Get lineHeight (effectively text size / zoom level)
 		json_t* lineHeightJ = json_object_get(rootJ, "lineHeight");
-		if (lineHeightJ)
-			lineHeight = json_number_value(lineHeightJ); 
+		if (lineHeightJ) {
+			lineHeight = clamp(json_number_value(lineHeightJ),SPELLBOOK_MIN_LINEHEIGHT,SPELLBOOK_MAX_LINEHEIGHT);
+		}
 
 		json_t* widthJ = json_object_get(rootJ, "width");
 		if (widthJ) {
-			width = json_number_value(widthJ); 
+			width = clamp(json_number_value(widthJ),SPELLBOOK_MIN_WIDTH,SPELLBOOK_MAX_WIDTH); 
 		}
 
 		dirty = true;
@@ -578,7 +587,18 @@ struct SpellbookTextField : LedDisplayTextField {
 	}
 	
 	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer != 1 || !module) return;  // Only draw on the correct layer, and only if active
+		if (layer != 1) return;  // Only draw on the text layer
+		
+		// Textfield backdrop
+		nvgBeginPath(args.vg);
+		nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 200));
+		nvgRect(args.vg, -2, -2, box.size.x+4, box.size.y+4);
+		nvgFill(args.vg);
+		nvgStrokeColor(args.vg, textColor);  // White color with full opacity
+		nvgStrokeWidth(args.vg, 1.0);  // Set the width of the stroke
+		nvgStroke(args.vg);  // Apply the stroke to the path
+		
+		if (!module) return;  // Only proceed if module is active
 				
 		if (!focused) {
 			// Autoscroll logic
@@ -595,14 +615,7 @@ struct SpellbookTextField : LedDisplayTextField {
 		// Slightly oversized box so we can draw a bordered backdrop for the textfield
 		nvgScissor(args.vg, args.clipBox.pos.x-2, args.clipBox.pos.y-2, args.clipBox.size.x+4, args.clipBox.size.y+4);
 		
-		// Textfield backdrop
-		nvgBeginPath(args.vg);
-		nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 200));
-		nvgRect(args.vg, -2, -2, box.size.x+4, box.size.y+4);
-		nvgFill(args.vg);
-		nvgStrokeColor(args.vg, textColor);  // White color with full opacity
-		nvgStrokeWidth(args.vg, 1.0);  // Set the width of the stroke
-		nvgStroke(args.vg);  // Apply the stroke to the path
+
 
 		// Make sure the scissor matches our box... for now.
 		nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
@@ -965,16 +978,16 @@ struct SpellbookTextField : LedDisplayTextField {
 		return cleanedText;
 	}
 	
-	void resizeText(float delta) {
+	void resizeText(float delta) { // Resize relative to current size
 		float target = lineHeight + delta;
-		lineHeight = clamp(target, 4.f, 128.f);
+		lineHeight = clamp(target, SPELLBOOK_MIN_LINEHEIGHT, SPELLBOOK_MAX_LINEHEIGHT);
 		charWidth = lineHeight * 0.5;
 		module->lineHeight = lineHeight;
 		module->dirty = true;
 	}
 	
-	void sizeText(float size) {
-		lineHeight = clamp(size, 4.f, 128.f);
+	void sizeText(float size) { // Set an absolute size
+		lineHeight = clamp(size, SPELLBOOK_MIN_LINEHEIGHT, SPELLBOOK_MAX_LINEHEIGHT);
 		charWidth = lineHeight * 0.5;
 		module->lineHeight = lineHeight;
 		module->dirty = true;
@@ -1113,7 +1126,7 @@ struct SpellbookResizeHandle : OpaqueWidget {
 		Rect oldBox = mw->box;
 		// Minimum and maximum number of holes we allow the module to be.
 		const float minWidth = SPELLBOOK_MIN_WIDTH * RACK_GRID_WIDTH;
-		const float maxWidth = SPELLBOOK_DEFAULT_WIDTH * RACK_GRID_WIDTH * 2;
+		const float maxWidth = SPELLBOOK_MAX_WIDTH * RACK_GRID_WIDTH;
 		if (right) {
 			newBox.size.x += deltaX;
 			newBox.size.x = std::fmax(newBox.size.x, minWidth);
@@ -1174,7 +1187,18 @@ struct SpellbookWidget : ModuleWidget {
 		
 		// We have to manually resize immediately because the SVG must be the width of the max size panel, ready to be cropped
 		if (module) {
-			box.size.x = module->width * RACK_GRID_WIDTH; // Storing width here lets all the widgets and Undo see it
+			int oldWidth = module->width;
+			int newWidth = oldWidth;
+			box.size.x = module->width * RACK_GRID_WIDTH; // Match width from module
+			
+			while (newWidth >= SPELLBOOK_MIN_WIDTH && !APP->scene->rack->requestModulePos(this, box.pos)) {
+				newWidth--; // Shrink until we either hit a valid box position, or min size
+				box.size.x = newWidth * RACK_GRID_WIDTH;
+			}
+			
+			if (newWidth != oldWidth) {
+				module->width = newWidth; // Push that back to the module
+			}
 		} else {
 			box.size.x = SPELLBOOK_DEFAULT_WIDTH * RACK_GRID_WIDTH; // Default width (i.e. for browser
 		}
@@ -1217,7 +1241,7 @@ struct SpellbookWidget : ModuleWidget {
 		
         // Load and position right brass element
         rightBrass = new SvgWidget();
-        rightBrass->setSvg(Svg::load(asset::plugin(pluginInstance, "res/brass_right.svg")));
+        rightBrass->setSvg(Svg::load(asset::plugin(pluginInstance, "res/brass_right_spellbook.svg")));
         rightBrass->box.pos = Vec(box.size.x - rightBrass->box.size.x, 0); // Initially position; adjust y as needed
         addChild(rightBrass);
 		
@@ -1276,10 +1300,22 @@ struct SpellbookWidget : ModuleWidget {
 		
 		// This whole section is exactly what the main widget also does when the module is created
 		if (module) { // If the module is loaded
-			box.size.x = module->width * RACK_GRID_WIDTH; // Get width from module
+			int oldWidth = module->width;
+			int newWidth = oldWidth;
+			box.size.x = module->width * RACK_GRID_WIDTH; // Match width from module
+			
+			while (newWidth >= SPELLBOOK_MIN_WIDTH && !APP->scene->rack->requestModulePos(this, box.pos)) {
+				newWidth--; // Shrink until we either hit a valid box position, or min size
+				box.size.x = newWidth * RACK_GRID_WIDTH;
+			}
+			
+			if (newWidth != oldWidth) {
+				module->width = newWidth; // Push that back to the module
+			}
 		} else { // module is not loaded, like when showing the module in the module browser
 			box.size.x = SPELLBOOK_DEFAULT_WIDTH * RACK_GRID_WIDTH; // default
 		}
+		
 		
 		// This continually moves the handle and ports relative to the right edge of the panel
 		if (rightHandle && module && textField) {
