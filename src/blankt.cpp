@@ -144,6 +144,7 @@ struct BlanktWidget : ModuleWidget {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/blank.svg")));
 		box.size.x = 6 * RACK_GRID_WIDTH; // Default width (i.e. for browser
+		// We have to manually resize immediately because the SVG is the width of the max size panel, ready to be cropped
 		
 		if (module) {
 			box.size.x = module->width * RACK_GRID_WIDTH; // Storing width here lets all the widgets and Undo see it

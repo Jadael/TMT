@@ -4,7 +4,10 @@
 #include <vector>
 #include <map>
 #include <iomanip>
+
 #define GRID_SNAP 10.16 // 10.16mm grid for placing components
+#define SPELLBOOK_DEFAULT_WIDTH 48
+#define SPELLBOOK_MIN_WIDTH 18
 
 struct StepData {
     float voltage;
@@ -72,6 +75,7 @@ struct Spellbook : Module {
 	Timer resetIgnoreTimer; // Timer to ignore Clock input briefly after Reset triggers
     std::vector<StepData> lastValues;
     int currentStep = 0;
+	int width = SPELLBOOK_DEFAULT_WIDTH; // Default width for the module is 48hp
     //std::string text = "0 ?Column 1, 0 ?Column 2, 0 ?Column 3, 0 ?Column 4\n0, 0, 0, 0\n0, 0, 0, 0\n0, 0, 0, 0"; // A default sequence that outputs four labelled 0s for 4 steps
 	
 	// Default text is a little tutorial
@@ -115,7 +119,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
         }
         outputs[POLY_OUTPUT].setChannels(16);
 			// TODO: The compiler keeps complaining about array bounds, because we're basically just pinky-promising ourselves to never change the number of channels and a lot of loops just ASSUME 16 channels. Need to change something about how we distribute all the right values to all the right channels to avoid that awkwardness.
-        
+        width = SPELLBOOK_DEFAULT_WIDTH; // Not sure this is needed, I just feel safer with it here.
 		fullyInitialized = true;
     }
 	
@@ -140,6 +144,11 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		if (textJ)
 			text = json_string_value(textJ);
 		
+		json_t* widthJ = json_object_get(rootJ, "width");
+		if (widthJ) {
+			width = json_number_value(widthJ);
+		}
+		
 		dirty = true;
 	}
 
@@ -147,6 +156,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		json_t* rootJ = json_object();
 		json_object_set_new(rootJ, "text", json_stringn(text.c_str(), text.size()));
 		json_object_set_new(rootJ, "lineHeight", json_real(lineHeight));
+		json_object_set_new(rootJ, "width", json_real(width));
 		return rootJ;
 	}
 
@@ -160,6 +170,11 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		json_t* lineHeightJ = json_object_get(rootJ, "lineHeight");
 		if (lineHeightJ)
 			lineHeight = json_number_value(lineHeightJ); 
+
+		json_t* widthJ = json_object_get(rootJ, "width");
+		if (widthJ) {
+			width = json_number_value(widthJ); 
+		}
 
 		dirty = true;
 	}
@@ -470,25 +485,39 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 
 // Undo struct holding the two things (prior/next text state) it needs to be able to give back to the module
 struct SpellbookUndoRedoAction : history::ModuleAction {
-	std::string old_text;
-	std::string new_text;
+	std::string old_text, new_text;
+	int old_width, new_width;
 
 	SpellbookUndoRedoAction(int64_t id, std::string oldText, std::string newText) : old_text{oldText}, new_text{newText} {
 		moduleId = id;
 		name = "Spellbook text edit";
+		old_width = new_width = -1; // flag as "not a resize"
+	}
+	
+	SpellbookUndoRedoAction(int64_t id, int oldWidth, int newWidth) : old_width{oldWidth}, new_width{newWidth} {
+		moduleId = id;
+		name = "Spellbook panel resize";
 	}
 
 	void undo() override {
 		Spellbook *module = dynamic_cast<Spellbook*>(APP->engine->getModule(moduleId));
 		if (module) {
-			module->overrideText(this->old_text);
+			if (old_width < 0) {// This must have been a text edit
+				module->overrideText(this->old_text);
+			} else {
+				module->width = old_width;
+			}
 		}
 	}
 
 	void redo() override {
 	Spellbook *module = dynamic_cast<Spellbook*>(APP->engine->getModule(moduleId));
 		if (module) {
-			module->overrideText(this->new_text);
+			if (new_width < 0) {// This must have been a text edit
+				module->overrideText(this->new_text);
+			} else {
+				module->width = new_width;
+			}
 		}
 	}
 };
@@ -1051,10 +1080,104 @@ struct SpellbookTextField : LedDisplayTextField {
     }
 };
 
+struct SpellbookResizeHandle : OpaqueWidget {
+	Vec dragPos;
+	Rect originalBox;
+	Spellbook* module;
+	bool right = false;  // True for one on the right side.
+
+	SpellbookResizeHandle() {
+	// One hole wide and full length tall.
+		box.size = Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
+	}
+
+	void onDragStart(const DragStartEvent& e) override {
+		if (e.button != GLFW_MOUSE_BUTTON_LEFT)
+			return;
+
+		dragPos = APP->scene->rack->getMousePos();
+		ModuleWidget* mw = getAncestorOfType<ModuleWidget>();
+		assert(mw);
+		originalBox = mw->box;
+	}
+
+	void onDragMove(const DragMoveEvent& e) override {
+		ModuleWidget* mw = getAncestorOfType<ModuleWidget>();
+		assert(mw);
+		int original_width = module->width;
+
+		Vec newDragPos = APP->scene->rack->getMousePos();
+		float deltaX = newDragPos.x - dragPos.x;
+
+		Rect newBox = originalBox;
+		Rect oldBox = mw->box;
+		// Minimum and maximum number of holes we allow the module to be.
+		const float minWidth = SPELLBOOK_MIN_WIDTH * RACK_GRID_WIDTH;
+		const float maxWidth = SPELLBOOK_DEFAULT_WIDTH * RACK_GRID_WIDTH * 2;
+		if (right) {
+			newBox.size.x += deltaX;
+			newBox.size.x = std::fmax(newBox.size.x, minWidth);
+			newBox.size.x = std::fmin(newBox.size.x, maxWidth);
+			newBox.size.x = std::round(newBox.size.x / RACK_GRID_WIDTH) * RACK_GRID_WIDTH;
+		} else {
+			newBox.size.x -= deltaX;
+			newBox.size.x = std::fmax(newBox.size.x, minWidth);
+			newBox.size.x = std::fmin(newBox.size.x, maxWidth);
+			newBox.size.x = std::round(newBox.size.x / RACK_GRID_WIDTH) * RACK_GRID_WIDTH;
+			newBox.pos.x = originalBox.pos.x + originalBox.size.x - newBox.size.x;
+		}
+		// Set box and test whether it's valid.
+		mw->box = newBox;
+		if (!APP->scene->rack->requestModulePos(mw, newBox.pos)) {
+			mw->box = oldBox;
+		}
+		module->width = std::round(mw->box.size.x / RACK_GRID_WIDTH); // Storing it here lets all the widgets see it
+		
+		if (original_width != module->width) { // Move to onDragEnd()?
+			// Make resizing an undo/redo action. If I don't do this, undoing a
+			// different module's move will cause them to overlap (aka, a
+			// transporter malfunction).
+			APP->history->push(new SpellbookUndoRedoAction(module->id, original_width, module->width));
+		}
+	}
+};
+
 struct SpellbookWidget : ModuleWidget {
+	SpellbookResizeHandle* rightHandle;
+	SvgWidget* rightBrass;
+	BrassPortOut* polyOutput;
+    BrassPortOut* out01Output;
+    BrassPortOut* out09Output;
+    BrassPortOut* out02Output;
+    BrassPortOut* out10Output;
+    BrassPortOut* out03Output;
+    BrassPortOut* out11Output;
+    BrassPortOut* out04Output;
+    BrassPortOut* out12Output;
+    BrassPortOut* out05Output;
+    BrassPortOut* out13Output;
+    BrassPortOut* out06Output;
+    BrassPortOut* out14Output;
+    BrassPortOut* out07Output;
+    BrassPortOut* out15Output;
+    BrassPortOut* out08Output;
+    BrassPortOut* out16Output;
+    BrassPortOut* relativeOutput;
+    BrassPortOut* absoluteOutput;
+	SpellbookTextField* textField;
+	
+	int width = SPELLBOOK_DEFAULT_WIDTH; // Default width of Spellbook
+	
 	SpellbookWidget(Spellbook* module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/spellbook.svg")));
+		
+		// We have to manually resize immediately because the SVG must be the width of the max size panel, ready to be cropped
+		if (module) {
+			box.size.x = module->width * RACK_GRID_WIDTH; // Storing width here lets all the widgets and Undo see it
+		} else {
+			box.size.x = SPELLBOOK_DEFAULT_WIDTH * RACK_GRID_WIDTH; // Default width (i.e. for browser
+		}
 		
 		addParam(createParamCentered<BrassToggle>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*6)), module, Spellbook::TOGGLE_SWITCH));
 		
@@ -1066,29 +1189,10 @@ struct SpellbookWidget : ModuleWidget {
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*3.0)), module, Spellbook::RESET_INPUT));
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*4.5)), module, Spellbook::INDEX_INPUT));
 		
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22.5, GRID_SNAP*1)), module, Spellbook::POLY_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*2)), module, Spellbook::OUT01_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*2)), module, Spellbook::OUT09_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*3)), module, Spellbook::OUT02_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*3)), module, Spellbook::OUT10_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*4)), module, Spellbook::OUT03_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*4)), module, Spellbook::OUT11_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*5)), module, Spellbook::OUT04_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*5)), module, Spellbook::OUT12_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*6)), module, Spellbook::OUT05_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*6)), module, Spellbook::OUT13_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*7)), module, Spellbook::OUT06_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*7)), module, Spellbook::OUT14_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*8)), module, Spellbook::OUT07_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*8)), module, Spellbook::OUT15_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*9)), module, Spellbook::OUT08_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*9)), module, Spellbook::OUT16_OUTPUT));
-		
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*22, GRID_SNAP*10.5)), module, Spellbook::RELATIVE_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*23, GRID_SNAP*10.5)), module, Spellbook::ABSOLUTE_OUTPUT));
+
 		
         // Main text field
-        SpellbookTextField* textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*3, GRID_SNAP*0.25)));
+        textField = createWidget<SpellbookTextField>(mm2px(Vec(GRID_SNAP*3, GRID_SNAP*0.25)));
         textField->setSize(Vec(mm2px(GRID_SNAP*18), RACK_GRID_HEIGHT-mm2px(GRID_SNAP*0.5)));
         textField->module = module;
         addChild(textField);
@@ -1098,20 +1202,135 @@ struct SpellbookWidget : ModuleWidget {
             textField->setText(module->text);
 			textField->sizeText(module->lineHeight);
 			textField->cleanAndPublishText();
-        }	
+        }
+		
+		// Resize bar on right.
+		//SpellbookResizeHandle* rightHandle = createWidget<SpellbookResizeHandle>(Vec(box.size.x - RACK_GRID_WIDTH, 0));
+		rightHandle = new SpellbookResizeHandle;
+		rightHandle->box.pos.x = box.size.x - RACK_GRID_WIDTH; // Scoot to the right edge minus 1hp;
+		rightHandle->right = true;
+		rightHandle->module = module;
+		// Make sure the handle is correctly placed if drawing for the module
+		// browser.
+		
+		addChild(rightHandle);
+		
+        // Load and position right brass element
+        rightBrass = new SvgWidget();
+        rightBrass->setSvg(Svg::load(asset::plugin(pluginInstance, "res/brass_right.svg")));
+        rightBrass->box.pos = Vec(box.size.x - rightBrass->box.size.x, 0); // Initially position; adjust y as needed
+        addChild(rightBrass);
+		
+		// Right hand output ports
+		// store this port as a class member so we can move it around later, then add it as an output like normal;
+        // Create output ports
+        polyOutput = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22.5, GRID_SNAP * 1)), module, Spellbook::POLY_OUTPUT);
+        out01Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22, GRID_SNAP * 2)), module, Spellbook::OUT01_OUTPUT);
+        out09Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 23, GRID_SNAP * 2)), module, Spellbook::OUT09_OUTPUT);
+        out02Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22, GRID_SNAP * 3)), module, Spellbook::OUT02_OUTPUT);
+        out10Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 23, GRID_SNAP * 3)), module, Spellbook::OUT10_OUTPUT);
+        out03Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22, GRID_SNAP * 4)), module, Spellbook::OUT03_OUTPUT);
+        out11Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 23, GRID_SNAP * 4)), module, Spellbook::OUT11_OUTPUT);
+        out04Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22, GRID_SNAP * 5)), module, Spellbook::OUT04_OUTPUT);
+        out12Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 23, GRID_SNAP * 5)), module, Spellbook::OUT12_OUTPUT);
+        out05Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22, GRID_SNAP * 6)), module, Spellbook::OUT05_OUTPUT);
+        out13Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 23, GRID_SNAP * 6)), module, Spellbook::OUT13_OUTPUT);
+        out06Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22, GRID_SNAP * 7)), module, Spellbook::OUT06_OUTPUT);
+        out14Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 23, GRID_SNAP * 7)), module, Spellbook::OUT14_OUTPUT);
+        out07Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22, GRID_SNAP * 8)), module, Spellbook::OUT07_OUTPUT);
+        out15Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 23, GRID_SNAP * 8)), module, Spellbook::OUT15_OUTPUT);
+        out08Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22, GRID_SNAP * 9)), module, Spellbook::OUT08_OUTPUT);
+        out16Output = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 23, GRID_SNAP * 9)), module, Spellbook::OUT16_OUTPUT);
+        relativeOutput = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 22, GRID_SNAP * 10.5)), module, Spellbook::RELATIVE_OUTPUT);
+        absoluteOutput = createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 23, GRID_SNAP * 10.5)), module, Spellbook::ABSOLUTE_OUTPUT);
+
+        // Add outputs to module
+        addOutput(polyOutput);
+        addOutput(out01Output);
+        addOutput(out09Output);
+        addOutput(out02Output);
+        addOutput(out10Output);
+        addOutput(out03Output);
+        addOutput(out11Output);
+        addOutput(out04Output);
+        addOutput(out12Output);
+        addOutput(out05Output);
+        addOutput(out13Output);
+        addOutput(out06Output);
+        addOutput(out14Output);
+        addOutput(out07Output);
+        addOutput(out15Output);
+        addOutput(out08Output);
+        addOutput(out16Output);
+        addOutput(relativeOutput);
+        addOutput(absoluteOutput);
     }
 	
-/* 	void appendContextMenu(Menu* menu) override {
+	void step() override {
+		// This resize system is borrowed with love from Fermata by mahlenmorris
+		
 		Spellbook* module = dynamic_cast<Spellbook*>(this->module);
-
-		menu->addChild(new MenuSeparator);
-
-		// Controls int Module::mode
-		menu->addChild(createIndexPtrSubmenuItem("Mode",
-			{"Hi-fi", "Mid-fi", "Lo-fi"},
-			&module->mode
-		));
-	} */
+		// While this is really only useful to call when the width changes,
+		// I don't think it's currently worth the effort to ONLY call it then.
+		// And maybe the *first* time step() is called.
+		
+		// This whole section is exactly what the main widget also does when the module is created
+		if (module) { // If the module is loaded
+			box.size.x = module->width * RACK_GRID_WIDTH; // Get width from module
+		} else { // module is not loaded, like when showing the module in the module browser
+			box.size.x = SPELLBOOK_DEFAULT_WIDTH * RACK_GRID_WIDTH; // default
+		}
+		
+		// This continually moves the handle and ports relative to the right edge of the panel
+		if (rightHandle && module && textField) {
+			float rightEdge = box.size.x;
+			
+			rightHandle->box.pos.x = rightEdge - rightHandle->box.size.x;
+			
+			// Resize the text field
+			textField->box.size.x = rightEdge - mm2px(GRID_SNAP*3) - textField->box.pos.x;
+			
+			// Also move the ports (scary! never let them go out of bounds, probably?)
+			float portOffset = polyOutput->box.size.x / 2;
+			float leftColumn = mm2px(GRID_SNAP*3);
+			float rightColumn = mm2px(GRID_SNAP*2);
+			float portMin = mm2px(RACK_GRID_WIDTH);
+			float portMax = box.size.x - mm2px(RACK_GRID_WIDTH);
+			
+			// Centered poly port
+			polyOutput->box.pos.x = clamp(box.size.x - mm2px(GRID_SNAP*2.5) + portOffset,portMin,portMax);
+			
+			// Left colummn
+			out01Output->box.pos.x = clamp(rightEdge - leftColumn + portOffset,portMin,portMax);
+			out02Output->box.pos.x = clamp(rightEdge - leftColumn + portOffset,portMin,portMax);
+			out03Output->box.pos.x = clamp(rightEdge - leftColumn + portOffset,portMin,portMax);
+			out04Output->box.pos.x = clamp(rightEdge - leftColumn + portOffset,portMin,portMax);
+			out05Output->box.pos.x = clamp(rightEdge - leftColumn + portOffset,portMin,portMax);
+			out06Output->box.pos.x = clamp(rightEdge - leftColumn + portOffset,portMin,portMax);
+			out07Output->box.pos.x = clamp(rightEdge - leftColumn + portOffset,portMin,portMax);
+			out08Output->box.pos.x = clamp(rightEdge - leftColumn + portOffset,portMin,portMax);
+			
+			relativeOutput->box.pos.x = clamp(rightEdge - leftColumn + portOffset,portMin,portMax);
+			
+			// Right column
+			out09Output->box.pos.x = clamp(rightEdge - rightColumn + portOffset,portMin,portMax);
+			out10Output->box.pos.x = clamp(rightEdge - rightColumn + portOffset,portMin,portMax);
+			out11Output->box.pos.x = clamp(rightEdge - rightColumn + portOffset,portMin,portMax);
+			out12Output->box.pos.x = clamp(rightEdge - rightColumn + portOffset,portMin,portMax);
+			out13Output->box.pos.x = clamp(rightEdge - rightColumn + portOffset,portMin,portMax);
+			out14Output->box.pos.x = clamp(rightEdge - rightColumn + portOffset,portMin,portMax);
+			out15Output->box.pos.x = clamp(rightEdge - rightColumn + portOffset,portMin,portMax);
+			out16Output->box.pos.x = clamp(rightEdge - rightColumn + portOffset,portMin,portMax);
+			
+			absoluteOutput->box.pos.x = clamp(rightEdge - rightColumn + portOffset,portMin,portMax);
+		}
+		
+		if (rightBrass && module) {
+			rightBrass->box.pos.x = box.size.x - rightBrass->box.size.x;
+		}
+		
+		ModuleWidget::step();
+	}
 };
 
 Model* modelSpellbook = createModel<Spellbook, SpellbookWidget>("Spellbook");
