@@ -4,7 +4,7 @@
 #include <vector>
 #include <map>
 #include <iomanip>
-#define GRID_SNAP 10.16
+#define GRID_SNAP 10.16 // 10.16mm grid for placing components
 
 struct StepData {
     float voltage;
@@ -187,7 +187,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 	// b (flat) , ♭ (flat), ♯ (sharp), # (sharp)
 	// TODO: Maybe changes to a syntax like <Note Letter>[Accidentals]<Octave Number>, so we can count and handle double sharps like C##4, etc.?
     std::vector<std::pair<std::string, int>> noteToSemitone = {
-		{"C##",2},{"Cbb",-2},{"C#",1},{"Cb",-1},{"C♯",1},{"C♭",-1},{"C♯♯",2},{"C♭♭",-2},{"C",0},{"D##",4},{"Dbb",0},{"D#",3},{"Db",1},{"D♯",3},{"D♭",1},{"D♯♯",4},{"D♭♭",0},{"D",2},{"E##",6},{"Ebb",2},{"E#",5},{"Eb",3},{"E♯",5},{"E♭",3},{"E♯♯",6},{"E♭♭",2},{"E",4},{"F##",7},{"Fbb",3},{"F#",6},{"Fb",4},{"F♯",6},{"F♭",4},{"F♯♯",7},{"F♭♭",3},{"F",5},{"G##",9},{"Gbb",5},{"G#",8},{"Gb",6},{"G♯",8},{"G♭",6},{"G♯♯",9},{"G♭♭",5},{"G",7},{"A##",11},{"Abb",7},{"A#",10},{"Ab",8},{"A♯",10},{"A♭",8},{"A♯♯",11},{"A♭♭",7},{"A",9},{"B##",13},{"Bbb",9},{"B#",12},{"Bb",10},{"B♯",12},{"B♭",10},{"B♯♯",13},{"B♭♭",9},{"B",11}
+		{"C##",2},{"Cbb",-2},{"C#",1},{"Cb",-1},{"C♯♯",2},{"C♭♭",-2},{"C♯",1},{"C♭",-1},{"C",0},{"D##",4},{"Dbb",0},{"D#",3},{"Db",1},{"D♯♯",4},{"D♭♭",0},{"D♯",3},{"D♭",1},{"D",2},{"E##",6},{"Ebb",2},{"E#",5},{"Eb",3},{"E♯♯",6},{"E♭♭",2},{"E♯",5},{"E♭",3},{"E",4},{"F##",7},{"Fbb",3},{"F#",6},{"Fb",4},{"F♯♯",7},{"F♭♭",3},{"F♯",6},{"F♭",4},{"F",5},{"G##",9},{"Gbb",5},{"G#",8},{"Gb",6},{"G♯♯",9},{"G♭♭",5},{"G♯",8},{"G♭",6},{"G",7},{"A##",11},{"Abb",7},{"A#",10},{"Ab",8},{"A♯♯",11},{"A♭♭",7},{"A♯",10},{"A♭",8},{"A",9},{"B##",13},{"Bbb",9},{"B#",12},{"Bb",10},{"B♯♯",13},{"B♭♭",9},{"B♯",12},{"B♭",10},{"B",11}
     };
 
 	// Converts a note name and octave to a voltage based on Eurorack 1V/oct standard
@@ -293,7 +293,6 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		return 0.0f;  // Default value if no format matches and parsing fails
 	}
 	
-
     // Attempts to parse a string to an integer, safely handling exceptions
     bool tryParseOctave(const std::string& text, int& octaveOut) {
         try {
@@ -335,7 +334,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 						stepData[index].type = 'R';  // Gate with Retrigger (0v for 1ms at start of step, then 10v after)
 					} else {
 						stepData[index].voltage = parsePitch(cell);
-						stepData[index].type = 'N';
+						stepData[index].type = 'N'; // Normal, anything that translates to a simple voltage/pitch
 					}
 				}
 					
@@ -505,7 +504,7 @@ struct SpellbookTextField : LedDisplayTextField {
 	
 	// Brute force a 2:1 monospaced grid.
     float lineHeight = 12.0f; // This also gets used as the font size
-	float charWidth = lineHeight*0.5; // Text is almost always drawn character by character, stepping by this amount
+	float charWidth = lineHeight*0.5; // Text is almost always drawn character by character, stepping by this amount, instead of 
 	
 	NVGcolor textColor = nvgRGB(255, 215, 0); // Bright gold text
 	NVGcolor commaColor = nvgRGB(155, 131, 0); // Dark gold commas
@@ -605,7 +604,7 @@ struct SpellbookTextField : LedDisplayTextField {
 
 		int lineIndex = 0;  // Line index to match with steps
 		
-		if (focused) {		
+		if (focused) {
 			// Draw an all-black backdrop, with plenty of bleed
 			nvgBeginPath(args.vg);
 			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 140));
@@ -732,7 +731,7 @@ struct SpellbookTextField : LedDisplayTextField {
 			float stepSize = std::min(lineHeight,14.f); // step numbers max out at a smaller size or it looks bad
 			float stepY = 0 + (lineHeight - stepSize)*0.5; // center them to their row, looks better when they're smaller
 			nvgFontSize(args.vg, stepSize); 
-			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL); // This ends up averaging their widths to get back to monospace
+			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL); // So we can move it left by one text-length
 			float stepX = -stepTextWidth - 2;  // Right-align in gutter, with constant padding
 			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(158, 80, 191) : nvgRGB(155, 131, 0));  // Current step in purple, others in gold
 			nvgText(args.vg, stepX, y+stepY, stepNumber.c_str(), NULL);
