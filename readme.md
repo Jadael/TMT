@@ -4,7 +4,6 @@ A collection of esoteric modules mostly focused around manipulating RNG and poly
 - [VCV Rack Library plugin page](https://library.vcvrack.com/TMT)
 
 # Shuffle
-
 ![Shuffle](screenshots/shuffle.png)
 
 Shuffles the channels of an incoming polyphonic signal and outputs the re-ordered signal. The module allows you to control the number of output channels and provides a trigger input to initiate the shuffle. The shuffle is deterministic, meaning that the same seed will always give the same shuffle. If no seed is provided, the module will generate and use a new (unpredictable) seed on every trigger input.
@@ -17,7 +16,6 @@ Shuffles the channels of an incoming polyphonic signal and outputs the re-ordere
 - Alt Mode: Allow input channels to potentially be selected multiple times in the output
 
 ## Inputs & Outputs
-
 - Shuffle Trigger: Triggers a shuffle of the polyphonic voltages, according to the current Seed.
 - Poly In (optional): Polyphonic signal to be shuffled. If no cable is connected, a one-octave chromatic scale will be used as the default input.
 - Seed (optional): Provide a random seed for the shuffle. The same seed will always gives the same shuffle. If no cable is connected, a new (unpredictable) seed will be generated on every trigger input.
@@ -27,7 +25,6 @@ Shuffles the channels of an incoming polyphonic signal and outputs the re-ordere
 ---
 
 # Calendar
-
 ![Calendar](screenshots/calendar.png)
 
 Calendar generates a set of very slow LFO-like signals representing the progress through various various time/calendar units. The module outputs voltages ranging from 0 to 10V, where each voltage corresponds to the current "progress" through the respective time unit.
@@ -56,7 +53,6 @@ Each time unit has a row of five outputs:
 ---
 
 # Seed
-
 ![Seed](screenshots/seed.png)
 
 Seed is a random voltage generator with 16 outputs and a polyphonic output, providing random values based on a given input voltage as the seed. When the input seed changes, the module generates 16 random numbers normalized between 0.0V and 10.0V. These random values are output individually across the 16 numbered outputs and as a polyphonic signal through the polyphonic output.
@@ -68,7 +64,6 @@ Seed is a random voltage generator with 16 outputs and a polyphonic output, prov
 - Alt Mode: Snap outputs to 0v or 10v - useful for generating a gate pattern.
 
 ## Inputs and Outputs
-
 - Seed: Input voltage used as the seed for random number generation. If no input is connected, initializes to a random seed.
 - Poly Out: Polyphonic output with 16 channels containing random voltages.
 - Out 1 - Out 16: Individual outputs for each of the 16 random voltages generated.
@@ -76,7 +71,6 @@ Seed is a random voltage generator with 16 outputs and a polyphonic output, prov
 ---
 
 # Ouroboros
-
 ![Ouroboros](screenshots/ouroboros.png)
 
 Ouroboros steps through polyphonic channels to turn it into a sequence.
@@ -87,7 +81,6 @@ Ouroboros steps through polyphonic channels to turn it into a sequence.
 - Alt Mode: Output the average of current and next step
 
 ## Inputs and Outputs
-
 - Poly Input: A polyphonic input for connecting the source polyphonic signal to step through.
 - Clock: An input for connecting an external clock source to control the stepping through the sequence.
 - Reset: An input for connecting a reset trigger signal to reset the sequence to the first step. Uses Grids style: if Clock is low, arm the Reset for next Clock. If Clock is high, Reset immediately.
@@ -97,7 +90,6 @@ Ouroboros steps through polyphonic channels to turn it into a sequence.
 ---
 
 # Append
-
 ![Append](screenshots/append.png)
 
 Takes multiple mono or poly input signals and combines them into a single polyphonic output with a selectable range of channels. Control the output width and rotation to create a customizable polyphonic subset of voltages from the input signals.
@@ -108,7 +100,6 @@ Takes multiple mono or poly input signals and combines them into a single polyph
 4. Connect the Poly Out output to the desired destination. The module will output a polyphonic subset of voltages from the inputs, as specified by the Width and Rotation controls.
 
 ## Inputs and Outputs
-
 - Signal 1-16 Inputs: Connect up to 16 mono or poly input signals.
 - Width: Control voltage input to set the output width (number of channels).
 - Rotation: Control voltage input to set the output starting point.
@@ -116,9 +107,9 @@ Takes multiple mono or poly input signals and combines them into a single polyph
 
 ---
 
+# Sight
 ![Sight](screenshots/sight.png)
 
-# Sight
 A real-time, logarithmic scope. Time is shown non-linearly, letting you see a both short term and long term structures in the signal. Less precise than a normal scope; this is intended to just "keep an eye" on a signal and form an intuition for what it's up to. Scope range is -10 to +10.
 
 ## Inputs / Outputs
@@ -127,13 +118,11 @@ A real-time, logarithmic scope. Time is shown non-linearly, letting you see a bo
 ---
 
 # Spellbook (PREVIEW)
-
 ![Spellbook](screenshots/spellbook.png)
 
 Spellbook is a module to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs (and a polyphonic output which combines all of them), each of which outputs a voltage determined by the corresponding column in RhythML-formatted text input. Spellbook is not yet in the VCV Rack Library version of this plugin; check [Releases](https://github.com/Jadael/TMT/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
 
 ## Inputs & Outputs
-
 - **Step Forward**: Advances to the next step in the sequence on the rising edge of a trigger.
 - **Step Backward**: Advances to the prior step in the sequence on the rising edge of a trigger.
 - **Reset Input**: Resets the sequence to the first step on the rising edge of the input signal.
@@ -147,10 +136,9 @@ Spellbook is a module to sequence pitch and control voltage (CV) patterns in a e
 - **Absolute Index Out**: Outputs the current step as a voltage, e.g. step 3 outputs 3.0v.
 
 ## Sequencing with RhythML
-
 Spellbook sequences are programmed using the RhythML format, a syntax to define pitch and CV patterns in plain text. Each line in the text input represents a sequence step, triggered sequentially by the clock input. Columns in the text represent the 16 outputs, allowing for complex configurations across multiple hardware modules.
 
-### RhythML Features
+### RhythML
 **Voltages and Gates**
 - **Decimal Voltages**: Directly specify voltage outputs by writing decimal numbers.
 - **Percentages**: Numbers ending in `%` (e.g. `50%` or `12.5%`), are translated so that 0% = 0.0v and 100% = 10.0v.
@@ -158,17 +146,15 @@ Spellbook sequences are programmed using the RhythML format, a syntax to define 
 
 **Pitch Representations**
 These are all parsed and translated into 1v/Octave. Decimals are allowed for all of them, but microtones may not be supported by all things you send those signals to.
-- **Scientific Pitch Names**: Specify pitches using standard note names (e.g., `C4`, `G#3`).
-- **MIDI numbers**: Numbers prefixed with `m` (e.g. `m60`) are parsed as MIDI note numbers. 60 = C4.
-- **Semitones**: Numbers prefixed with `S` (e.g. `s7`) are parsed as semitones relative to C4.
-- **Cents**: Numbers ending with `ct` are parsed as cents relative to C4.
+- **Scientific Pitch Names**: Specify pitches using standard note names (e.g., `C4`, `G#3`). C4 = 0.0v.
+- **MIDI numbers**: Numbers prefixed with `m` (e.g. `m60`) are parsed as MIDI note numbers. m60 = C4.
+- **Semitones**: Numbers prefixed with `S` (e.g. `s7`) are parsed as semitones relative to C4. s0 = C4.
+- **Cents**: Numbers ending with `ct` are parsed as cents relative to C4. 0ct = C4.
 - **Hertz**: Numbers ending with `Hz` are parsed as frequencies.
 
-
-Refer to [RhythML Syntax Specification](RhythML.md) for comprehensive guidelines on writing sequences for Spellbook.
+Refer to [RhythML Syntax Specification](RhythML.md) for comprehensive guidelines on the syntax.
 
 ### Usage Example
-
 Here's a simple RhythML sequence to get started:
 
 ```
@@ -199,17 +185,35 @@ Watch a brief demonstration here:
 
 [![YouTube Demo](https://img.youtube.com/vi/vhQHPlpJW-Q/0.jpg)](https://www.youtube.com/watch?v=vhQHPlpJW-Q)
 
+## Controls and Hotkeys
+The Spellbook module offers a variety of hotkeys and controls for managing its interface and functionality effectively. Here is a comprehensive list of controls and hotkeys available for the Spellbook module:
+
+### Text Field Behavior:
+- Click the text to enter "editing mode". You'll see the text cursor when focused. The prior sequence will continue playing "in the background", unchanged, as you edit, until you "commit" a new one.
+- Edit your sequence, making sure to follow the syntax rules. 
+- Click away to leave editing mode, or press `Ctrl`+`Enter`, to "commit" the text.
+- Spellbook will trim and/or pad cells so that columns align vertically, and send the updated text to its internal buffer to be parsed.
+- The parser evaluates each cell and tries to convert it into an appropriate output voltage. Errors default to 0 volts.
+- It tries to stay on the same "current step" if it can, but will modulo the current step into the new sequence length.
+  
+### Special Keyboard Shortcuts:
+- `Ctrl`+`Enter`: Force parses the current text into steps and applies any changes immediately.
+- `Ctrl`+`[` or `Ctrl`+`]`: Decreases or increases the text size, respectively.
+  
+### Additional Notes:
+- **Resizing:** You can resize the module by dragging the right edge of the panel.
+- **Autoscroll:** When not in editing mode, the text field autoscrolls to keep the current step centered.
+- **Scrolling**: When in editing mode, you can scroll up and down using the mouse wheel, or in any direction by moving the text cursor until it touches the edge of the viewport.
+
 ---
 
 # Stats (PREVIEW)
-
 ![Stats](screenshots/stats.png)
 
-Stats is a statistical function module for VCV Rack. It computes and outputs various statistical metrics from the signals of a polyphonic input cable. Stats is not yet in the VCV Rack Library version of this plugin; check [Releases](https://github.com/Jadael/TMT/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
+Stats is a statistical function module. It computes and outputs various statistical metrics from the signals of a polyphonic input cable. Stats is not yet in the VCV Rack Library version of this plugin; check [Releases](https://github.com/Jadael/TMT/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
 
 ## Inputs & Outputs
-
-- **Toggle Audio Rate**: By default, Stats runs at step rate (~10-60hz). Toggle this to run at audio rate, which is pretty CPU heavy.
+- **Toggle Audio Rate**: By default, Stats recalculates every 10ms. Toggle this to run at audio rate, which is pretty CPU heavy.
 
 - **Polyphonic Input**: Receives the polyphonic signals to analyze.
 
@@ -230,5 +234,4 @@ Stats is a statistical function module for VCV Rack. It computes and outputs var
 ---
 
 ## License
-
 This project is licensed under the MIT License. See the [license.txt](license.txt) file for more information.
