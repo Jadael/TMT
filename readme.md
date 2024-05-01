@@ -197,7 +197,7 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 - It tries to stay on the same "current step" if it can, but will modulo the current step into the new sequence length.
   
 ### Special Keyboard Shortcuts:
-- `Ctrl`+`Enter`: Force parses the current text into steps and applies any changes immediately.
+- `Ctrl`+`Enter`: Commit and parse the current text into the sequence buffer.
 - `Ctrl`+`[` or `Ctrl`+`]`: Decreases or increases the text size, respectively.
   
 ### Additional Notes:
@@ -224,9 +224,9 @@ Stats is a statistical function module. It computes and outputs various statisti
 	- If no modes are found, outputs 0.
 - **Geometric Mean Output**: Outputs the geometric mean of the input voltages.
 - **Product Output**: Outputs the product of all input voltages.
-	- !!! WARNING !!! THis can produced extremely large voltages (e.g. quickly rises to greater than a million volts ), think about safety precautions!
+	- !!! WARNING !!! This can output extremely large voltages (e.g. quickly rises to millions of volts), take safety precautions!
 - **Count Output**: Outputs the number of active channels in the input as an integer voltage.
-	- !!! WARNING !!! The output range for this port is 0.0v to 16.0v.
+	- !!! WARNING !!! The output range can exceed 10v, counts can go from 0.0v to 16.0v.
 - **Sum Output**: Outputs the sum of all input voltages.
 - **Ascending Output**: Outputs the input voltages sorted in ascending order.
 - **Distinct Output**: Outputs one of each distinct voltage from the input, ignoring very close values (+/- 0.0001v) as not distinct.

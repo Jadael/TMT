@@ -571,6 +571,7 @@ struct SpellbookTextField : LedDisplayTextField {
 				cursorPos = 0;
 			}
 		}
+		
 		// Cursor position relative to box
 		float cursorY = cursorLine * lineHeight;
 		float cursorX = cursorPos * charWidth;
@@ -815,6 +816,26 @@ struct SpellbookTextField : LedDisplayTextField {
 		return textPosition;
 	}
 	
+	Vec getCursorPosition(int cursor) {
+		std::string text = getText();
+		int cursorLine = 0;
+		int cursorPos = 0;
+		int maxLineLength = 0;
+		for (size_t i = 0; i < (size_t)cursor; ++i) {
+			cursorPos++;
+			if (text[i] == '\n') {
+				cursorLine++;
+				if (cursorPos > maxLineLength) maxLineLength = cursorPos;
+				cursorPos = 0;
+			}
+		}
+		// Cursor position relative to box
+		float cursorY = cursorLine * lineHeight + 0.5f;
+		float cursorX = cursorPos * charWidth + 0.5f;
+		
+		return Vec(cursorX,cursorY);
+	}
+	
     void setScrollLimits(float contentHeight, float viewportHeight) {
 		maxY = 0.0f;  // Top edge can never move down past 0
         if (contentHeight > viewportHeight) {
@@ -1013,7 +1034,11 @@ struct SpellbookTextField : LedDisplayTextField {
 		if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
 			if (e.key == GLFW_KEY_ENTER) {
 				if ((e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
+					Vec cursorPos = getCursorPosition(std::min(cursor,selection));
 					startParse();
+					cursor = getTextPosition(Vec(cursorPos.x,cursorPos.y));
+					selection = cursor;
+					clampCursor();
 					e.consume(this);
 					return;
 				} else {
