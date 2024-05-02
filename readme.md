@@ -3,6 +3,16 @@ A collection of esoteric modules mostly focused around manipulating RNG and poly
 
 - [VCV Rack Library plugin page](https://library.vcvrack.com/TMT)
 
+## Table of Contents
+- [Shuffle](#shuffle) - Reorder the channels of a polyphonic signal.
+- [Calendar](#calendar} - Output LFO-like signals based on local time and day.
+- [Seed](#seed) - 16 seedable random numbers.
+- [Ouroboros](#ouroboros) - Step through the channels of a polyphonic signal like a sequence.
+- [Append](#append) - Combine the channels of up to 16 mono or polyphonic cables (up to an internal buffer of 128 channels), and output up to a 16 channel slice of them.
+- [Sight](#sight) - A screen-rate scope where time slows down over the width of the scope.
+- [Spellbook](#spellbook) - Plain text sequencing.
+- [Stats](#stats) - Get statistical measures like mean, median, mode, etc. of a polyphonic signal.
+
 # Shuffle
 ![Shuffle](screenshots/shuffle.png)
 
@@ -117,7 +127,7 @@ A real-time, logarithmic scope. Time is shown non-linearly, letting you see a bo
 
 ---
 
-# Spellbook (PREVIEW)
+# Spellbook
 ![Spellbook](screenshots/spellbook.png)
 
 Spellbook is a module to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs (and a polyphonic output which combines all of them), each of which outputs a voltage determined by the corresponding column in RhythML-formatted text input. Spellbook is not yet in the VCV Rack Library version of this plugin; check [Releases](https://github.com/Jadael/TMT/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
@@ -221,7 +231,7 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 
 ---
 
-# Stats (PREVIEW)
+# Stats
 ![Stats](screenshots/stats.png)
 
 Stats is a statistical function module. It computes and outputs various statistical metrics from the signals of a polyphonic input cable. Stats is not yet in the VCV Rack Library version of this plugin; check [Releases](https://github.com/Jadael/TMT/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
