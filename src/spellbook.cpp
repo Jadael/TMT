@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <iomanip>
+#include <regex>
 
 #define GRID_SNAP 10.16 // 10.16mm grid for placing components
 #define SPELLBOOK_DEFAULT_WIDTH 48
@@ -79,6 +80,8 @@ struct Spellbook : Module {
     std::vector<StepData> lastValues;
     int currentStep = 0;
 	int width = SPELLBOOK_DEFAULT_WIDTH; // Default width for the module is 48hp
+	// Map of accidentals and their offsets
+
     //std::string text = "0 ?Column 1, 0 ?Column 2, 0 ?Column 3, 0 ?Column 4\n0, 0, 0, 0\n0, 0, 0, 0\n0, 0, 0, 0"; // A default sequence that outputs four labelled 0s for 4 steps
 	
 	// Default text is a little tutorial
@@ -210,7 +213,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 	// Map to convert note names into semitone offsets relative to C4
 	// b (flat) , ♭ (flat), ♯ (sharp), # (sharp)
 	// TODO: Maybe changes to a syntax like <Note Letter>[Accidentals]<Octave Number>, so we can count and handle double sharps like C##4, etc.?
-    std::vector<std::pair<std::string, int>> noteToSemitone = {
+/*     std::vector<std::pair<std::string, int>> noteToSemitone = {
 		{"C##",2},{"Cbb",-2},{"C#",1},{"Cb",-1},{"C♯♯",2},{"C♭♭",-2},{"C♯",1},{"C♭",-1},{"C",0},{"D##",4},{"Dbb",0},{"D#",3},{"Db",1},{"D♯♯",4},{"D♭♭",0},{"D♯",3},{"D♭",1},{"D",2},{"E##",6},{"Ebb",2},{"E#",5},{"Eb",3},{"E♯♯",6},{"E♭♭",2},{"E♯",5},{"E♭",3},{"E",4},{"F##",7},{"Fbb",3},{"F#",6},{"Fb",4},{"F♯♯",7},{"F♭♭",3},{"F♯",6},{"F♭",4},{"F",5},{"G##",9},{"Gbb",5},{"G#",8},{"Gb",6},{"G♯♯",9},{"G♭♭",5},{"G♯",8},{"G♭",6},{"G",7},{"A##",11},{"Abb",7},{"A#",10},{"Ab",8},{"A♯♯",11},{"A♭♭",7},{"A♯",10},{"A♭",8},{"A",9},{"B##",13},{"Bbb",9},{"B#",12},{"Bb",10},{"B♯♯",13},{"B♭♭",9},{"B♯",12},{"B♭",10},{"B",11}
     };
 
@@ -223,6 +226,49 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 			}
 		}
 		return 0.0f;  // Return 0.0 volts if the noteName is not found (optional: handle this case more gracefully)
+	} */
+	
+	// Helper functions to convert accidental symbols to semitone shifts
+	std::map<std::string, int> accidentalToShift = {
+		{"#", 1}, {"♯", 1}, {"B", -1}, {"♭", -1}, {"♮", 0}
+	};
+	
+	// Computes semitone offset from C for a given note letter and accidentals
+	int letterAccidentalsToSemitone(char letter, const std::string& accidentals) {
+		int baseSemitone = 0;
+
+		switch (letter) {
+			case 'C': baseSemitone = 0; break;
+			case 'D': baseSemitone = 2; break;
+			case 'E': baseSemitone = 4; break;
+			case 'F': baseSemitone = 5; break;
+			case 'G': baseSemitone = 7; break;
+			case 'A': baseSemitone = 9; break;
+			case 'B': baseSemitone = 11; break;
+			default: return 0;  // Error case
+		}
+
+		int accidentalShift = 0;
+		for (const char& acc : accidentals) {
+			std::string accStr(1, acc);
+			if (accidentalToShift.count(accStr)) {
+				accidentalShift += accidentalToShift[accStr];
+			}
+		}
+
+		return baseSemitone + accidentalShift;
+	}
+
+	// Converts a note name and octave to a voltage
+	float noteNameToVoltage(const std::string& noteName, int octave) {
+		if (noteName.empty()) return 0.0f;
+		
+		char noteLetter = noteName[0];
+		std::string accidentals = noteName.substr(1);
+
+		int semitoneOffsetFromC4 = letterAccidentalsToSemitone(noteLetter, accidentals) + (octave - 4) * 12;
+
+		return static_cast<float>(semitoneOffsetFromC4) / 12.0f;
 	}
 	
 	// Scale Hertz to 1v/Octave
@@ -295,19 +341,26 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 			}
 		}
 
-		// Parse note name and octave (e.g., "C4")
-        for (const auto& notePair : noteToSemitone) {
-            const std::string& noteName = notePair.first;
-            if (cell.rfind(noteName, 0) == 0) { // Ensure the cell starts with the note name
-                std::string octavePart = cell.substr(noteName.length());
-                int octave = 4; // Default octave
-                if (tryParseOctave(octavePart, octave)) {
-                    return noteNameToVoltage(noteName, octave);
-                } else {
-                    return noteNameToVoltage(noteName, 4); // Fallback if octave parsing fails
-                }
-            }
-        }
+		for (size_t i = 0; i < cell.size(); ++i) {
+			if (isdigit(cell[i]) || cell[i] == '-' || cell[i] == '+') {
+				std::string notePart = cell.substr(0, i);
+				std::string octavePart = cell.substr(i);
+
+				int octave = 4;
+				if (tryParseOctave(octavePart, octave)) {
+					return noteNameToVoltage(notePart, octave);
+				} else {
+					return noteNameToVoltage(notePart, 4);
+				}
+			}
+		}
+		
+		try {
+			std::string notePart = cell;
+			return noteNameToVoltage(notePart, 4);
+		} catch (...) {
+			// Do nothing
+		}
 
 		// If no format is matched, assume it's a decimal voltage value directly
 		if (isDecimal(cell)) {
