@@ -149,7 +149,7 @@ Spellbook sequences are programmed using the RhythML format, a syntax to define 
 
 **Pitch Representations**
 These are all parsed and translated into 1v/Octave. Decimals are allowed for all of them, but microtones may not be supported by all things you send those signals to. Case is NOT sensitive. Errors and undefined values become 0v.
-- **Scientific Pitch Names**: Specify pitches by name and octave (e.g., `C4`, `G#3`). `C4` and `C` = 0.0v.
+- **Scientific Pitch Names**: Specify pitches by name and octave (e.g., `C4`, `G#3`, `Ab4`). `C4` and `C` = 0.0v.
 - **MIDI numbers**: Numbers prefixed with `m` (e.g. `m60`) are parsed as MIDI note numbers. `m60` = C4.
 - **Semitones**: Numbers prefixed with `s` (e.g. `s7`) are parsed as semitones relative to C4. `s0` = C4.
 - **Cents**: Numbers ending with `ct` are parsed as cents relative to C4. `0ct` = C4.
