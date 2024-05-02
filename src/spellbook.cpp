@@ -214,28 +214,10 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
         }
         return it == s.end() && s.size() > (s.front() == '-' || s.front() == '+' ? 1 : 0);
     }
-
-	// Map to convert note names into semitone offsets relative to C4
-	// b (flat) , ♭ (flat), ♯ (sharp), # (sharp)
-	// TODO: Maybe changes to a syntax like <Note Letter>[Accidentals]<Octave Number>, so we can count and handle double sharps like C##4, etc.?
-/*     std::vector<std::pair<std::string, int>> noteToSemitone = {
-		{"C##",2},{"Cbb",-2},{"C#",1},{"Cb",-1},{"C♯♯",2},{"C♭♭",-2},{"C♯",1},{"C♭",-1},{"C",0},{"D##",4},{"Dbb",0},{"D#",3},{"Db",1},{"D♯♯",4},{"D♭♭",0},{"D♯",3},{"D♭",1},{"D",2},{"E##",6},{"Ebb",2},{"E#",5},{"Eb",3},{"E♯♯",6},{"E♭♭",2},{"E♯",5},{"E♭",3},{"E",4},{"F##",7},{"Fbb",3},{"F#",6},{"Fb",4},{"F♯♯",7},{"F♭♭",3},{"F♯",6},{"F♭",4},{"F",5},{"G##",9},{"Gbb",5},{"G#",8},{"Gb",6},{"G♯♯",9},{"G♭♭",5},{"G♯",8},{"G♭",6},{"G",7},{"A##",11},{"Abb",7},{"A#",10},{"Ab",8},{"A♯♯",11},{"A♭♭",7},{"A♯",10},{"A♭",8},{"A",9},{"B##",13},{"Bbb",9},{"B#",12},{"Bb",10},{"B♯♯",13},{"B♭♭",9},{"B♯",12},{"B♭",10},{"B",11}
-    };
-
-	// Converts a note name and octave to a voltage based on Eurorack 1V/oct standard
-	float noteNameToVoltage(const std::string& noteName, int octave) {
-		for (const auto& notePair : noteToSemitone) {
-			if (notePair.first == noteName) {
-				int semitoneOffsetFromC4 = notePair.second + (octave - 4) * 12;
-				return static_cast<float>(semitoneOffsetFromC4) / 12.0f;
-			}
-		}
-		return 0.0f;  // Return 0.0 volts if the noteName is not found (optional: handle this case more gracefully)
-	} */
 	
-	// Helper functions to convert accidental symbols to semitone shifts
+	// Map of accidental symbols to semitone shifts
 	std::map<std::string, float> accidentalToShift = {
-		{"#", 1.f}, {"♯", 1.f}, {"B", -1.f}, {"♭", -1.f}, {"♮", 0.f}, {"D",-0.5f}, {"$", 0.5f}
+		{"#", 1.f}, {"B", -1.f}, {"D",-0.5f}, {"$", 0.5f}, {"~",-0.25f}, {"`",0.25f}
 	};
 	
 	// Computes semitone offset from C for a given note letter and accidentals
@@ -683,8 +665,9 @@ struct SpellbookTextField : LedDisplayTextField {
 
 		// Configure font
 		std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/Hack-Regular.ttf"));
+		//std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/BravuraText.otf"));
 		if (!font) { // Use app font as a backup
-			std::shared_ptr<window::Font> font = APP->window->loadFont(fontPath);
+			font = APP->window->loadFont(fontPath);
 		}
 		if (!font) return;
 		nvgFontFaceId(args.vg, font->handle);
@@ -754,7 +737,6 @@ struct SpellbookTextField : LedDisplayTextField {
 		}
 
 		// Draw each line of text
-		
 		while (std::getline(lines, line)) {
 			nvgFontSize(args.vg, lineHeight);  // Brute force match lineHeight
 			
@@ -1151,7 +1133,7 @@ struct SpellbookTextField : LedDisplayTextField {
 				if (!(e.mods & GLFW_MOD_SHIFT)) {
 					selection = cursor;
 				}
-								e.consume(this);
+				e.consume(this);
 				return;
 			} else if (e.keyName == "]" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
 				resizeText(1);
