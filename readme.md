@@ -5,7 +5,7 @@ A collection of esoteric modules mostly focused around manipulating RNG and poly
 
 ## Table of Contents
 - [Shuffle](#shuffle) - Reorder the channels of a polyphonic signal.
-- [Calendar](#calendar} - Output LFO-like signals based on local time and day.
+- [Calendar](#calendar) - Output LFO-like signals based on local time and day.
 - [Seed](#seed) - 16 seedable random numbers.
 - [Ouroboros](#ouroboros) - Step through the channels of a polyphonic signal like a sequence.
 - [Append](#append) - Combine the channels of up to 16 mono or polyphonic cables (up to an internal buffer of 128 channels), and output up to a 16 channel slice of them.

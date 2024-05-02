@@ -131,8 +131,12 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 	
 	
 	void updateLabels(std::vector<std::string> labels) {
+		// Frist default all the labels
+        for (int i = 0; i < 16; ++i) { 
+            configOutput(OUT01_OUTPUT + i, "Column " + std::to_string(i + 1));
+            outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
+        }
 		// Config the output using comments from Row 1 as labels:
-		// To-do: Reset outputs past the end of this list (i.e. now unused columns) back to their default
 		for (size_t i = 0; i < labels.size(); ++i) {
 			configOutput(OUT01_OUTPUT + i, labels[i]);
 		}
