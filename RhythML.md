@@ -27,7 +27,7 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
 3. **Scientific Pitch Names**:
    - Format: `<NoteName><Octave>`
    - Example: `C4`, `G#3`, `Db5`
-   - Accidentals can be `#` for sharp, and `b` for flat. Double+ sharps and flats are allowed, and accidentals can be on any note, so `E#` is the same note as `F` and `Cb` is the same as `B`.
+   - Accidentals can be `#` for sharp, `b` for flat, `$` for half-sharp, and `d` for half-flat. Compound accidentals like `C##` (C +2 semitones) or `C#$` (C +1.5 semitones) are allowed, and accidentals can be on any note, so `E#` is the same note as `F` and `Cb` is the same as `B`.
    - *If no octave is included, but it is still valid note name, a default octave of 4 is used. For example "C" will be read as "C4".*
    - *Outputs a voltage corresponding to the specified musical note, in Eurorack 1V/oct standard, where C4 = 0V, C#4 = 1/12V, ..., B4 = 11/12V, C5 = 1V, C3 = -1V, etc.*
    
