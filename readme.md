@@ -130,27 +130,30 @@ Spellbook is a module to sequence pitch and control voltage (CV) patterns in a e
 
 - **Index Mode Toggle**: Toggle the Index to "absolute address" mode, where 1v is step one, 2v is step two, etc.
 
-- **Poly Out**: Outputs all 16 voltages as a polyphonic signal.
-- **Out 1 - Out 16**: Individual outputs for each column specified in the RhythML sequence.
+- **Poly Out**: Outputs the values from the first 16 columns as channels of a polyphonic signal.
+- **Out 1 - Out 16**: Individual outputs for the first 16 columns specified in the RhythML sequence.
 - **Relative Index Out**: Outputs the current step as 0v = step 1, through to 10v = last step.
 - **Absolute Index Out**: Outputs the current step as a voltage, e.g. step 3 outputs 3.0v.
 
 ## Sequencing with RhythML
-Spellbook sequences are programmed using the RhythML format, a syntax to define pitch and CV patterns in plain text. Each line in the text input represents a sequence step, triggered sequentially by the clock input. Columns in the text represent the 16 outputs, allowing for complex configurations across multiple hardware modules.
+Spellbook sequences are programmed using the RhythML format, a syntax to define pitch and CV patterns in plain text as comma separated values. Each line in the text input represents a sequence step, typically triggered sequentially by the "Step Forward" input. Values in the "cells" are parsed to determine what voltage to output for each column in the current step.
 
 ### RhythML
 **Voltages and Gates**
 - **Decimal Voltages**: Directly specify voltage outputs by writing decimal numbers.
 - **Percentages**: Numbers ending in `%` (e.g. `50%` or `12.5%`), are translated so that 0% = 0.0v and 100% = 10.0v.
-- **Gate and Trigger Commands**: Use `X` or `_` for a gate-with-retrigger (guarantees a rising edge), `T` or `^` for a 1ms trigger pulse (guarantees a rising edge), and `W` or `|` for a full-width gate (no rising edge); as shorthand for rhythmic sequences.
+- **Gate and Trigger Commands**: Shorthand keywords for rhythmic outputs:
+	- `X` or `_` for a gate-with-retrigger (guarantees a rising edge)
+	- `T` or `^` for a 1ms trigger pulse (guarantees a rising edge)
+	- `W` or `|` for a full-width gate (no rising edge)
 
 **Pitch Representations**
-These are all parsed and translated into 1v/Octave. Decimals are allowed for all of them, but microtones may not be supported by all things you send those signals to.
-- **Scientific Pitch Names**: Specify pitches using standard note names (e.g., `C4`, `G#3`). C4 = 0.0v.
-- **MIDI numbers**: Numbers prefixed with `m` (e.g. `m60`) are parsed as MIDI note numbers. m60 = C4.
-- **Semitones**: Numbers prefixed with `S` (e.g. `s7`) are parsed as semitones relative to C4. s0 = C4.
-- **Cents**: Numbers ending with `ct` are parsed as cents relative to C4. 0ct = C4.
-- **Hertz**: Numbers ending with `Hz` are parsed as frequencies.
+These are all parsed and translated into 1v/Octave. Decimals are allowed for all of them, but microtones may not be supported by all things you send those signals to. Case is NOT sensitive. Errors and undefined values become 0v.
+- **Scientific Pitch Names**: Specify pitches by name and octave (e.g., `C4`, `G#3`). `C4` and `C` = 0.0v.
+- **MIDI numbers**: Numbers prefixed with `m` (e.g. `m60`) are parsed as MIDI note numbers. `m60` = C4.
+- **Semitones**: Numbers prefixed with `s` (e.g. `s7`) are parsed as semitones relative to C4. `s0` = C4.
+- **Cents**: Numbers ending with `ct` are parsed as cents relative to C4. `0ct` = C4.
+- **Hertz**: Numbers ending with `Hz` are parsed as frequencies. `261.63Hz` = C4.
 
 Refer to [RhythML Syntax Specification](RhythML.md) for comprehensive guidelines on the syntax.
 
@@ -164,7 +167,7 @@ D5        , X       , 60%
 B4        , X       , 50%
 ```
 
-In this example, each step sets a pitch in column one, uses column two for gating, and controls a velocity CV in column three. The sequence plays a C major arpeggio, gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored because of the `?`.
+In this example, each step sets a pitch in column one, uses column two for gating, and controls a velocity CV in column three. The sequence plays a C major arpeggio, gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored by the parser because they are comments starting with `?`.
 
 Here's the same arpeggio, but with a little more rhythmic variation:
 
@@ -179,7 +182,18 @@ B4        , X       , 50%
           ,         , 
 ```
 
-Notice the way this pattern holds notes by using consecutive gates over several steps, using Retriggers to ensure a new rising edge when the step begins (even after a full width gate). The first note is held for three steps.
+This pattern holds the first note over three steps by using consecutive `|` gates, using `X` Retriggers to ensure a new rising edge when notes begin (even after a full width gate).
+
+
+### Syncing Multiple Spellbooks
+The second pattern above is twice as many steps as before, so to play both sequences over the same duration, there are three basic approaches:
+
+- "Clock" them differently: step the longer one forward at twice the speed, because it is twice the length.
+- Use the Index input, in Relative mode, to sync them to the same LFO/Phasor.
+- Index one of the them to the Relative Index Output of the other. Note that the Relative Index Output is stochastic, 
+not smooth, so it doesn't work quite the same as an LFO/Phasor.
+	- If you sync the longer one to the short one, it will get four index voltages from the short one (one 
+for each step), which would mean it steps to *every other step* in its sequence.
 
 Watch a brief demonstration here:
 
