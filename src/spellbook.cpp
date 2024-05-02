@@ -234,26 +234,26 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 	} */
 	
 	// Helper functions to convert accidental symbols to semitone shifts
-	std::map<std::string, int> accidentalToShift = {
-		{"#", 1}, {"♯", 1}, {"B", -1}, {"♭", -1}, {"♮", 0}
+	std::map<std::string, float> accidentalToShift = {
+		{"#", 1.f}, {"♯", 1.f}, {"B", -1.f}, {"♭", -1.f}, {"♮", 0.f}, {"D",-0.5f}, {"$", 0.5f}
 	};
 	
 	// Computes semitone offset from C for a given note letter and accidentals
-	int letterAccidentalsToSemitone(char letter, const std::string& accidentals) {
-		int baseSemitone = 0;
+	float letterAccidentalsToSemitone(char letter, const std::string& accidentals) {
+		float baseSemitone = 0.f;
 
 		switch (letter) {
-			case 'C': baseSemitone = 0; break;
-			case 'D': baseSemitone = 2; break;
-			case 'E': baseSemitone = 4; break;
-			case 'F': baseSemitone = 5; break;
-			case 'G': baseSemitone = 7; break;
-			case 'A': baseSemitone = 9; break;
-			case 'B': baseSemitone = 11; break;
-			default: return 0;  // Error case
+			case 'C': baseSemitone = 0.f; break;
+			case 'D': baseSemitone = 2.f; break;
+			case 'E': baseSemitone = 4.f; break;
+			case 'F': baseSemitone = 5.f; break;
+			case 'G': baseSemitone = 7.f; break;
+			case 'A': baseSemitone = 9.f; break;
+			case 'B': baseSemitone = 11.f; break;
+			default: return 0.f;  // Error case
 		}
 
-		int accidentalShift = 0;
+		float accidentalShift = 0.f;
 		for (const char& acc : accidentals) {
 			std::string accStr(1, acc);
 			if (accidentalToShift.count(accStr)) {
@@ -271,7 +271,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		char noteLetter = noteName[0];
 		std::string accidentals = noteName.substr(1);
 
-		int semitoneOffsetFromC4 = letterAccidentalsToSemitone(noteLetter, accidentals) + (octave - 4) * 12;
+		float semitoneOffsetFromC4 = letterAccidentalsToSemitone(noteLetter, accidentals) + (octave - 4) * 12;
 
 		return static_cast<float>(semitoneOffsetFromC4) / 12.0f;
 	}
@@ -295,6 +295,11 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 	float parsePitch(const std::string& cell) {
 		if (cell.empty()) {
 			return 0.0f;  // Return default voltage for empty cells
+		}
+		
+		// Decimal values
+		if (isDecimal(cell)) {
+			return std::stof(cell);
 		}
 
 		// Handling for semitone offset input (e.g., "S0" should become 0.0 / C4, "S7" should be interpreted as 7 semitones above C4, etc.)
@@ -345,7 +350,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 				return 0.0f;  // Return default voltage if parsing fails
 			}
 		}
-
+		
 		for (size_t i = 0; i < cell.size(); ++i) {
 			if (isdigit(cell[i]) || cell[i] == '-' || cell[i] == '+') {
 				std::string notePart = cell.substr(0, i);
@@ -365,11 +370,6 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 			return noteNameToVoltage(notePart, 4);
 		} catch (...) {
 			// Do nothing
-		}
-
-		// If no format is matched, assume it's a decimal voltage value directly
-		if (isDecimal(cell)) {
-			return std::stof(cell);
 		}
 
 		return 0.0f;  // Default value if no format matches and parsing fails
@@ -506,7 +506,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		outputs[POLY_OUTPUT].setChannels(16);
 		std::vector<StepData>& currentValues = steps[currentStep];
 
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < 16; i++) { // Use PORT_MAX_CHANNELS instead of 16?
 			StepData& step = currentValues[i];
 			float outputValue = step.voltage;  // Start with the last known voltage
 
@@ -1162,6 +1162,7 @@ struct SpellbookTextField : LedDisplayTextField {
 		}
 		clampCursor(); // Safety rail, probably not needed
 		LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
+		// To-do: port all of onSelectKey() over to unify the UX
 		clampCursor();
 		updateSizeAndOffset();  // Validate size and offset after any keypress
 		scrollToCursor(); // Scroll to the cursor after any keypress
