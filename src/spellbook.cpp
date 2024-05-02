@@ -132,6 +132,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 	
 	void updateLabels(std::vector<std::string> labels) {
 		// Config the output using comments from Row 1 as labels:
+		// To-do: Reset outputs past the end of this list (i.e. now unused columns) back to their default
 		for (size_t i = 0; i < labels.size(); ++i) {
 			configOutput(OUT01_OUTPUT + i, labels[i]);
 		}
@@ -532,7 +533,9 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 					break;
 			}
 			outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
+			// To-do: Reset outputs past the end of this list (i.e. now unused columns) back to their default (0.0v)
 			outputs[POLY_OUTPUT].setVoltage(outputValue, i);
+			// To-do: Reset channels past the end of this list (i.e. now unused columns) back to their default, then maybe setChannels() also?
 			lastValues[i].voltage = outputValue;
 			lastValues[i].type = step.type;
 		}
