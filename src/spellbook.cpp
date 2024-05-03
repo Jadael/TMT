@@ -15,7 +15,7 @@
 
 struct StepData {
     float voltage;
-    char type;  // 'N' for normal, 'T' for trigger, 'R' for retrigger, 'G' for gate, 'E' for empty
+    char type;  // 'N' for normal, 'T' for trigger, 'R' for retrigger, 'G' for gate, 'E' for empty, 'U' for unused
 };
 
 struct Timer {
@@ -373,7 +373,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		std::istringstream ss(text);
 		std::string line;
 		while (getline(ss, line)) {
-			std::vector<StepData> stepData(16, StepData{0.0f, 'E'});  // Default all steps to 0.0 volts, empty type
+			std::vector<StepData> stepData(16, StepData{0.0f, 'U'});  // Default all steps to 0.0 volts, "Unused" type
 			std::istringstream lineStream(line);
 			std::string cell;
 			int index = 0;
@@ -400,6 +400,9 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 						stepData[index].voltage = parsePitch(cell);
 						stepData[index].type = 'N'; // Normal, anything that translates to a simple voltage/pitch
 					}
+				} else {
+						stepData[index].voltage = 0.0f;
+						stepData[index].type = 'E';  // Empty (but "active")
 				}
 					
 				index++;
@@ -490,7 +493,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 
 		for (int i = 0; i < 16; i++) { // Use PORT_MAX_CHANNELS instead of 16?
 			StepData& step = currentValues[i];
-			float outputValue = step.voltage;  // Start with the last known voltage
+			float outputValue = 0.f;  // Default 0v
 
 			switch (step.type) {
 				case 'T':  // Trigger
@@ -515,7 +518,11 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 				case 'E':  // Empty cells
 					outputValue = (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R') ? 0.0f : lastValues[i].voltage;
 					break;
+				case 'U': // Unused cells
+					outputValue = 0.f;
+					break;
 				default:
+					outputValue = 0.f;
 					break;
 			}
 			outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
