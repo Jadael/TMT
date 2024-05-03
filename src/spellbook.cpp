@@ -527,7 +527,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 			}
 			outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
 			outputs[POLY_OUTPUT].setVoltage(outputValue, i);
-			// To-do: Maybe setChannels() to removed unused columns?
+			// To-do: Maybe setChannels() to removed unused columns? We can assume the first cell of type 'U' is the first unused column.
 			lastValues[i].voltage = outputValue;
 			lastValues[i].type = step.type;
 		}
@@ -662,7 +662,7 @@ struct SpellbookTextField : LedDisplayTextField {
 	}
 	
 	void cursorToPrevCell() {
-		size_t pos = text.rfind(',', std::max(cursor - 2, 0));
+		size_t pos = text.rfind(',', std::max(cursor - 1, 0));
 		if (pos == std::string::npos)
 			cursor = 0;
 		else
