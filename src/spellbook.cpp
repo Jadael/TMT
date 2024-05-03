@@ -526,9 +526,8 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 					break;
 			}
 			outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
-			// To-do: Reset outputs past the end of this list (i.e. now unused columns) back to their default (0.0v)
 			outputs[POLY_OUTPUT].setVoltage(outputValue, i);
-			// To-do: Reset channels past the end of this list (i.e. now unused columns) back to their default, then maybe setChannels() also?
+			// To-do: Maybe setChannels() to removed unused columns?
 			lastValues[i].voltage = outputValue;
 			lastValues[i].type = step.type;
 		}
@@ -635,210 +634,7 @@ struct SpellbookTextField : LedDisplayTextField {
 			textOffset.x = clamp( -(cursorX - box.size.x * 0.5 + charWidth), -(maxLineLength * charWidth), 0.f);
 		}
 	}
-	
-	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer != 1) return;  // Only draw on the text layer
 		
-		// Textfield backdrop
-		nvgBeginPath(args.vg);
-		nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 200));
-		nvgRect(args.vg, -2, -2, box.size.x+4, box.size.y+4);
-		nvgFill(args.vg);
-		nvgStrokeColor(args.vg, textColor);  // White color with full opacity
-		nvgStrokeWidth(args.vg, 1.0);  // Set the width of the stroke
-		nvgStroke(args.vg);  // Apply the stroke to the path
-		
-		if (!module) return;  // Only proceed if module is active
-				
-		if (!focused) {
-			// Autoscroll logic
-			float targetY = -(module->currentStep * lineHeight - box.size.y / 2 + lineHeight / 2);
-			textOffset.y = clamp(targetY, minY, maxY);
-			
-			// Check for fresh text in the module, such as from an undo, and bring it in as if the user had typed it in
-			if (text != module->text) {
-				setText(module->text);
-				cleanAndPublishText();
-			}
-		}
-
-		// Slightly oversized box so we can draw a bordered backdrop for the textfield
-		nvgScissor(args.vg, args.clipBox.pos.x-2, args.clipBox.pos.y-2, args.clipBox.size.x+4, args.clipBox.size.y+4);
-		
-
-
-		// Make sure the scissor matches our box... for now.
-		nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
-
-		// Configure font
-		std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/Hack-Regular.ttf"));
-		//std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/BravuraText.otf"));
-		if (!font) { // Use app font as a backup
-			font = APP->window->loadFont(fontPath);
-		}
-		if (!font) return;
-		nvgFontFaceId(args.vg, font->handle);
-		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-
-		// Brute force a 12px by 6px grid.
-		//float lineHeight = 14;
-		//float charWidth = 7;
-
-		// Variables for text drawing
-		float x = textOffset.x;  // Horizontal text start - typically a small indent
-		float y = textOffset.y;  // Vertical scroll offset
-		std::string text = getText();
-		text += "\n"; // Add back in a trailing newline for drawing, else std::string gets confused about line count
-		std::istringstream lines(text);
-		std::string line;
-		int currentPos = 0;  // Current character position in the overall text
-		int selectionStart = std::min(cursor, selection);
-		int selectionEnd = std::max(cursor, selection);
-
-		int lineIndex = 0;  // Line index to match with steps
-		
-		if (focused) {
-			// Draw an all-black backdrop, with plenty of bleed
-			nvgBeginPath(args.vg);
-			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 140));
-			nvgRect(args.vg, 0, 0 - lineHeight*4, box.size.x, box.size.y + lineHeight*4);
-			nvgFill(args.vg);
-		} else {
-			// Draw column backgrounds
-			std::getline(lines, line); // Assume the first line gives the column layout
-			std::vector<float> columnWidths;
-			size_t startPos = 0;
-			while (startPos < line.length()) {
-				size_t nextComma = line.find(',', startPos);
-				if (nextComma == std::string::npos) {
-					nextComma = line.length();
-				}
-				size_t columnLength = nextComma - startPos + 1; // Include comma space in the width calculation
-				columnWidths.push_back(columnLength * charWidth);
-				startPos = nextComma + 1; // Skip comma
-			}
-
-			float columnStart = x;
-			float totalWidth = 0;
-			for (size_t i = 0; i < columnWidths.size(); ++i) {
-				nvgBeginPath(args.vg);
-				nvgFillColor(args.vg, i % 2 == 0 ? nvgRGBA(0, 0, 0, 140) : nvgRGBA(16, 16, 16, 140));  // Alternate colors
-				nvgRect(args.vg, columnStart, 0-lineHeight*4, columnWidths[i], box.size.y+lineHeight*4);
-				nvgFill(args.vg);
-				columnStart += columnWidths[i];
-				totalWidth += columnWidths[i];
-			}
-
-			// Calculate remaining width and draw dummy column if there's remaining space
-			float remainingWidth = box.size.x - totalWidth;
-			if (remainingWidth > 0) {
-				nvgBeginPath(args.vg);
-				nvgFillColor(args.vg, (columnWidths.size() % 2 == 0) ? nvgRGBA(16, 16, 16, 128) : nvgRGBA(0, 0, 0, 128));  // Invert so the alternation so the last real column is "continued"
-				nvgRect(args.vg, columnStart, 0-lineHeight*4, remainingWidth, box.size.y+lineHeight*4);
-				nvgFill(args.vg);
-			}
-
-			// Reset stream to start drawing text
-			lines.clear();
-			lines.seekg(0, std::ios::beg);
-		}
-
-		// Draw each line of text
-		while (std::getline(lines, line)) {
-			nvgFontSize(args.vg, lineHeight);  // Brute force match lineHeight
-			
-			if (y + lineHeight < 0) { // +lineHeight lets it draw one extra line, for bleed
-				y += lineHeight;
-				currentPos += line.size() + 1;
-				lineIndex++; // Only increment if not a `??` comment row? Would that work? This seems to only be used to determine what Step we're on, not wheere we're drawing
-				continue;
-			}
-			
-			if (y > box.size.y+lineHeight*2) {
-				break; // Stop once we've drawn two extra lines, for bleed
-			}
-			
-			// Use brighter color if current step and defocused (playing)
-			if (module->currentStep == lineIndex && !focused) {
-				lineColor = currentStepColor;
-			} else {
-				lineColor = textColor;
-			}
-			
-			activeColor = lineColor;
-			
-			for (size_t i = 0; i < line.length(); ++i) {
-				float charX = x + i * charWidth;  // X position of the character
-				
-				// If focused, draw selection background for this character if within selection bounds
-				if (focused && static_cast<size_t>(currentPos + i) >= static_cast<size_t>(selectionStart) && static_cast<size_t>(currentPos + i) < static_cast<size_t>(selectionEnd)) {
-					nvgBeginPath(args.vg);
-					nvgFillColor(args.vg, selectionColor);  // Selection color
-					nvgRect(args.vg, charX+0.5, y+0.5, charWidth-1, lineHeight-1);
-					nvgFill(args.vg);
-				}
-
-				// Draw the character
-				char str[2] = {line[i], 0};  // Temporary string for character
-				if (line[i] == ',') {
-					nvgFillColor(args.vg, commaColor); // Dark gold commas
-					nvgText(args.vg, charX, y, str, NULL); // draw the comma
-					activeColor = lineColor; // Reset to line color after commas
-				} else {
-					if (line[i] == '?') {
-						nvgFillColor(args.vg, commentCharColor); // Set the (maybe new) activeColor
-						nvgText(args.vg, charX, y, str, NULL); // draw the character
-						activeColor = commentColor; // "Snap" to comment color after a ?, which will be untouched until after the next comma
-					} else {
-						nvgFillColor(args.vg, activeColor); // Set the (maybe new) activeColor
-						nvgText(args.vg, charX, y, str, NULL); // draw the character
-					}
-				}
-			}
-			// Reset active and line color at the end of the line.
-			activeColor = textColor;
-			lineColor = textColor;
-
-			// If focused, draw cursor if within this line
-			if (focused && cursor >= currentPos && cursor < currentPos + (int)line.length() + 1) {
-				float cursorX = x + (cursor - currentPos) * charWidth;
-				nvgBeginPath(args.vg);
-				nvgFillColor(args.vg, cursorColor); 
-				nvgRect(args.vg, cursorX, y, charWidth*0.125f, lineHeight);
-				nvgFill(args.vg);
-			}
-
-			// Extend the scissor box into a gutter area
-				// Kinda rude, this should probably just be an area within this widget's box, but it does mean you can think of the x/y coordinates as belonging to the TEXT, ignoring the step labels.
-			nvgScissor(args.vg, args.clipBox.pos.x - GRID_SNAP * 4, args.clipBox.pos.y, 
-					   args.clipBox.size.x + GRID_SNAP * 4, args.clipBox.size.y);
-
-			// Draw step numbers in the gutter
-			std::string stepNumber = std::to_string(lineIndex + 1)+"┃";
-			if (module->currentStep == lineIndex) {
-				stepNumber = ""+ stepNumber;
-			}
-			//float stepSize = std::min(lineHeight,14.f);
-			//float centerOffset = stepSize / lineHeight;
-			float stepSize = std::min(lineHeight,14.f); // step numbers max out at a smaller size or it looks bad
-			float stepY = 0 + (lineHeight - stepSize)*0.5; // center them to their row, looks better when they're smaller
-			nvgFontSize(args.vg, stepSize); 
-			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL); // So we can move it left by one text-length
-			float stepX = -stepTextWidth - 2;  // Right-align in gutter, with constant padding
-			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(158, 80, 191) : nvgRGB(155, 131, 0));  // Current step in purple, others in gold
-			nvgText(args.vg, stepX, y+stepY, stepNumber.c_str(), NULL);
-			
-			// Back out of the gutter
-			nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
-
-			y += lineHeight;
-			currentPos += line.length() + 1;
-			lineIndex++;
-		}
-
-		nvgResetScissor(args.vg);
-	}
-	
 	int getTextPosition(math::Vec mousePos) override {
 		// The Core TextFIeld class tries to actually draw some text to a box so it can decide where all the characters are, but since we brute force a fixed-width grid for characters we just re-use that.
 
@@ -863,6 +659,23 @@ struct SpellbookTextField : LedDisplayTextField {
 		}
 		textPosition = clamp(textPosition,0,text.length());
 		return textPosition;
+	}
+	
+	void cursorToPrevCell() {
+		size_t pos = text.rfind(',', std::max(cursor - 2, 0));
+		if (pos == std::string::npos)
+			cursor = 0;
+		else
+			cursor = std::min((int) pos + 1, (int) text.size());
+		
+		if (text[cursor-1] == ',') cursor--;
+	}
+
+	void cursorToNextCell() {
+		size_t pos = text.find(',', std::min(cursor + 1, (int) text.size()));
+		if (pos == std::string::npos)
+			pos = text.size();
+		cursor = pos;
 	}
 	
 	Vec getCursorPosition(int cursor) {
@@ -1081,7 +894,20 @@ struct SpellbookTextField : LedDisplayTextField {
 	void onSelectKey(const SelectKeyEvent& e) override {
 		clampCursor(); // Safety rail, probably not needed
 		if (e.action == GLFW_PRESS || e.action == GLFW_REPEAT) {
-			if (e.key == GLFW_KEY_ENTER) {
+			// Jump Left
+			if (e.key == GLFW_KEY_LEFT && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
+				cursorToPrevCell();
+				if (!(e.mods & GLFW_MOD_SHIFT)) {
+					selection = cursor;
+				}
+				e.consume(this);
+			} else if (e.key == GLFW_KEY_RIGHT && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
+				cursorToNextCell();
+				if (!(e.mods & GLFW_MOD_SHIFT)) {
+					selection = cursor;
+				}
+				e.consume(this);
+			} else if (e.key == GLFW_KEY_ENTER) {
 				if ((e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
 					Vec cursorPos = getCursorPosition(std::min(cursor,selection));
 					startParse();
@@ -1146,13 +972,11 @@ struct SpellbookTextField : LedDisplayTextField {
 				resizeText(1);
 			} else if (e.keyName == "[" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
 				resizeText(-1);
+			} else {
+				LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
 			}
-			
 		}
 		clampCursor(); // Safety rail, probably not needed
-		LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
-		// To-do: port all of onSelectKey() over to unify the UX
-		clampCursor();
 		updateSizeAndOffset();  // Validate size and offset after any keypress
 		scrollToCursor(); // Scroll to the cursor after any keypress
 	}
@@ -1166,6 +990,209 @@ struct SpellbookTextField : LedDisplayTextField {
         }
         return elems;
     }
+	
+	void drawLayer(const DrawArgs& args, int layer) override {
+		if (layer != 1) return;  // Only draw on the text layer
+		
+		// Textfield backdrop
+		nvgBeginPath(args.vg);
+		nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 200));
+		nvgRect(args.vg, -2, -2, box.size.x+4, box.size.y+4);
+		nvgFill(args.vg);
+		nvgStrokeColor(args.vg, textColor);  // White color with full opacity
+		nvgStrokeWidth(args.vg, 1.0);  // Set the width of the stroke
+		nvgStroke(args.vg);  // Apply the stroke to the path
+		
+		if (!module) return;  // Only proceed if module is active
+				
+		if (!focused) {
+			// Autoscroll logic
+			float targetY = -(module->currentStep * lineHeight - box.size.y / 2 + lineHeight / 2);
+			textOffset.y = clamp(targetY, minY, maxY);
+			
+			// Check for fresh text in the module, such as from an undo, and bring it in as if the user had typed it in
+			if (text != module->text) {
+				setText(module->text);
+				cleanAndPublishText();
+			}
+		}
+
+		// Slightly oversized box so we can draw a bordered backdrop for the textfield
+		nvgScissor(args.vg, args.clipBox.pos.x-2, args.clipBox.pos.y-2, args.clipBox.size.x+4, args.clipBox.size.y+4);
+		
+
+
+		// Make sure the scissor matches our box... for now.
+		nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
+
+		// Configure font
+		std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/Hack-Regular.ttf"));
+		//std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/BravuraText.otf"));
+		if (!font) { // Use app font as a backup
+			font = APP->window->loadFont(fontPath);
+		}
+		if (!font) return;
+		nvgFontFaceId(args.vg, font->handle);
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+
+		// Brute force a 12px by 6px grid.
+		//float lineHeight = 14;
+		//float charWidth = 7;
+
+		// Variables for text drawing
+		float x = textOffset.x;  // Horizontal text start - typically a small indent
+		float y = textOffset.y;  // Vertical scroll offset
+		std::string text = getText();
+		text += "\n"; // Add back in a trailing newline for drawing, else std::string gets confused about line count
+		std::istringstream lines(text);
+		std::string line;
+		int currentPos = 0;  // Current character position in the overall text
+		int selectionStart = std::min(cursor, selection);
+		int selectionEnd = std::max(cursor, selection);
+
+		int lineIndex = 0;  // Line index to match with steps
+		
+		if (focused) {
+			// Draw an all-black backdrop, with plenty of bleed
+			nvgBeginPath(args.vg);
+			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 140));
+			nvgRect(args.vg, 0, 0 - lineHeight*4, box.size.x, box.size.y + lineHeight*4);
+			nvgFill(args.vg);
+		} else {
+			// Draw column backgrounds
+			std::getline(lines, line); // Assume the first line gives the column layout
+			std::vector<float> columnWidths;
+			size_t startPos = 0;
+			while (startPos < line.length()) {
+				size_t nextComma = line.find(',', startPos);
+				if (nextComma == std::string::npos) {
+					nextComma = line.length();
+				}
+				size_t columnLength = nextComma - startPos + 1; // Include comma space in the width calculation
+				columnWidths.push_back(columnLength * charWidth);
+				startPos = nextComma + 1; // Skip comma
+			}
+
+			float columnStart = x;
+			float totalWidth = 0;
+			for (size_t i = 0; i < columnWidths.size(); ++i) {
+				nvgBeginPath(args.vg);
+				nvgFillColor(args.vg, i % 2 == 0 ? nvgRGBA(0, 0, 0, 140) : nvgRGBA(16, 16, 16, 140));  // Alternate colors
+				nvgRect(args.vg, columnStart, 0-lineHeight*4, columnWidths[i], box.size.y+lineHeight*4);
+				nvgFill(args.vg);
+				columnStart += columnWidths[i];
+				totalWidth += columnWidths[i];
+			}
+
+			// Calculate remaining width and draw dummy column if there's remaining space
+			float remainingWidth = box.size.x - totalWidth;
+			if (remainingWidth > 0) {
+				nvgBeginPath(args.vg);
+				nvgFillColor(args.vg, (columnWidths.size() % 2 == 0) ? nvgRGBA(16, 16, 16, 128) : nvgRGBA(0, 0, 0, 128));  // Invert so the alternation so the last real column is "continued"
+				nvgRect(args.vg, columnStart, 0-lineHeight*4, remainingWidth, box.size.y+lineHeight*4);
+				nvgFill(args.vg);
+			}
+
+			// Reset stream to start drawing text
+			lines.clear();
+			lines.seekg(0, std::ios::beg);
+		}
+
+		// Draw each line of text
+		while (std::getline(lines, line)) {
+			nvgFontSize(args.vg, lineHeight);  // Brute force match lineHeight
+			
+			if (y + lineHeight < 0) { // +lineHeight lets it draw one extra line, for bleed
+				y += lineHeight;
+				currentPos += line.size() + 1;
+				lineIndex++; // Only increment if not a `??` comment row? Would that work? This seems to only be used to determine what Step we're on, not wheere we're drawing
+				continue;
+			}
+			
+			if (y > box.size.y+lineHeight*2) {
+				break; // Stop once we've drawn two extra lines, for bleed
+			}
+			
+			// Use brighter color if current step and defocused (playing)
+			if (module->currentStep == lineIndex && !focused) {
+				lineColor = currentStepColor;
+			} else {
+				lineColor = textColor;
+			}
+			
+			activeColor = lineColor;
+			
+			for (size_t i = 0; i < line.length(); ++i) {
+				float charX = x + i * charWidth;  // X position of the character
+				
+				// If focused, draw selection background for this character if within selection bounds
+				if (focused && static_cast<size_t>(currentPos + i) >= static_cast<size_t>(selectionStart) && static_cast<size_t>(currentPos + i) < static_cast<size_t>(selectionEnd)) {
+					nvgBeginPath(args.vg);
+					nvgFillColor(args.vg, selectionColor);  // Selection color
+					nvgRect(args.vg, charX+0.5, y+0.5, charWidth-1, lineHeight-1);
+					nvgFill(args.vg);
+				}
+
+				// Draw the character
+				char str[2] = {line[i], 0};  // Temporary string for character
+				if (line[i] == ',') {
+					nvgFillColor(args.vg, commaColor); // Dark gold commas
+					nvgText(args.vg, charX, y, str, NULL); // draw the comma
+					activeColor = lineColor; // Reset to line color after commas
+				} else {
+					if (line[i] == '?') {
+						nvgFillColor(args.vg, commentCharColor); // Set the (maybe new) activeColor
+						nvgText(args.vg, charX, y, str, NULL); // draw the character
+						activeColor = commentColor; // "Snap" to comment color after a ?, which will be untouched until after the next comma
+					} else {
+						nvgFillColor(args.vg, activeColor); // Set the (maybe new) activeColor
+						nvgText(args.vg, charX, y, str, NULL); // draw the character
+					}
+				}
+			}
+			// Reset active and line color at the end of the line.
+			activeColor = textColor;
+			lineColor = textColor;
+
+			// If focused, draw cursor if within this line
+			if (focused && cursor >= currentPos && cursor < currentPos + (int)line.length() + 1) {
+				float cursorX = x + (cursor - currentPos) * charWidth;
+				nvgBeginPath(args.vg);
+				nvgFillColor(args.vg, cursorColor); 
+				nvgRect(args.vg, cursorX, y, charWidth*0.125f, lineHeight);
+				nvgFill(args.vg);
+			}
+
+			// Extend the scissor box into a gutter area
+				// Kinda rude, this should probably just be an area within this widget's box, but it does mean you can think of the x/y coordinates as belonging to the TEXT, ignoring the step labels.
+			nvgScissor(args.vg, args.clipBox.pos.x - GRID_SNAP * 4, args.clipBox.pos.y, 
+					   args.clipBox.size.x + GRID_SNAP * 4, args.clipBox.size.y);
+
+			// Draw step numbers in the gutter
+			std::string stepNumber = std::to_string(lineIndex + 1)+"┃";
+			if (module->currentStep == lineIndex) {
+				stepNumber = ""+ stepNumber;
+			}
+			//float stepSize = std::min(lineHeight,14.f);
+			//float centerOffset = stepSize / lineHeight;
+			float stepSize = std::min(lineHeight,14.f); // step numbers max out at a smaller size or it looks bad
+			float stepY = 0 + (lineHeight - stepSize)*0.5; // center them to their row, looks better when they're smaller
+			nvgFontSize(args.vg, stepSize); 
+			float stepTextWidth = nvgTextBounds(args.vg, 0, 0, stepNumber.c_str(), NULL, NULL); // So we can move it left by one text-length
+			float stepX = -stepTextWidth - 2;  // Right-align in gutter, with constant padding
+			nvgFillColor(args.vg, (module->currentStep == lineIndex) ? nvgRGB(158, 80, 191) : nvgRGB(155, 131, 0));  // Current step in purple, others in gold
+			nvgText(args.vg, stepX, y+stepY, stepNumber.c_str(), NULL);
+			
+			// Back out of the gutter
+			nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
+
+			y += lineHeight;
+			currentPos += line.length() + 1;
+			lineIndex++;
+		}
+
+		nvgResetScissor(args.vg);
+	}
 };
 
 struct SpellbookResizeHandle : OpaqueWidget {
