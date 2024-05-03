@@ -197,7 +197,7 @@ struct BlanktWidget : ModuleWidget {
 		// I don't think it's currently worth the effort to ONLY call it then.
 		// And maybe the *first* time step() is called.
 		
-		// This whole section is exactly what the main widget also does when the module is created
+		// This whole section is exactly what the constructor does
 		if (module) { // If the module is loaded
 			int oldWidth = module->width;
 			int newWidth = oldWidth;
@@ -215,10 +215,12 @@ struct BlanktWidget : ModuleWidget {
 			box.size.x = BLANKT_DEFAULT_WIDTH * RACK_GRID_WIDTH; // default
 		}
 		
+		// Align the handle
 		if (rightHandle && module) {
 			rightHandle->box.pos.x = box.size.x - rightHandle->box.size.x;
 		}
 		
+		// Align the right side decorations
 		if (rightBrass && module) {
 			rightBrass->box.pos.x = box.size.x - rightBrass->box.size.x;
 		}
