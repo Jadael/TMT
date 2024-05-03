@@ -1,3 +1,4 @@
+```
 0:  BassPitch,  BassGate,  MPitch,  MGate,  Kick,  Snare,  Hat,  Volume,    Comment
 1:  c2,         x,         e4,      x,      t,     ,       t,    10,
 2:  ,           ,          ,        ,       ,      ,       t,    ,          
@@ -31,6 +32,7 @@
 30: ,           ,          ,        ,       ,      ,       t,    ,         
 31: ,           ,          c6-0.1,  x,      t,     t,      t,    ,          ? pitch shift ?
 32: ,           ,          ,        ,       ,      ,       t,    ,
+```
 
 ---
 
