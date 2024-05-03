@@ -114,7 +114,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		configInput(STEPBAK_INPUT, "Step Backward");
         configInput(RESET_INPUT, "Reset");
 		configInput(INDEX_INPUT, "Index");
-        configOutput(POLY_OUTPUT, "16 voltages from columns"); // This poly output will always be exactly 16 channels.
+        configOutput(POLY_OUTPUT, "Polyphonic voltages from columns");
 		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Toggle relative / absolute indexing");
 		configOutput(RELATIVE_OUTPUT, "Relative Index");
 		configOutput(ABSOLUTE_OUTPUT, "Absolute Index");
@@ -124,7 +124,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
             outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
         }
         outputs[POLY_OUTPUT].setChannels(16);
-			// TODO: The compiler keeps complaining about array bounds, because we're basically just pinky-promising ourselves to never change the number of channels and a lot of loops just ASSUME 16 channels. Need to change something about how we distribute all the right values to all the right channels to avoid that awkwardness.
+			// TODO: The compiler keeps complaining about array bounds, because we're basically just pinky-promising ourselves to never change the number of channels and a lot of places just ASSUME 16 channels. Need to change something about how we distribute all the right values to all the right channels to avoid that awkwardness.
         width = SPELLBOOK_DEFAULT_WIDTH; // Not sure this is needed, I just feel safer with it here.
 		fullyInitialized = true;
     }
@@ -136,7 +136,22 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
             configOutput(OUT01_OUTPUT + i, "Column " + std::to_string(i + 1));
             outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
         }
-		// Config the output using comments from Row 1 as labels:
+		
+		// Config the outputs using comments from Row 1 as labels
+		// Poly label
+		std::string polyOutputLabel = "Polyphonic voltages from columns";
+		if (!labels.empty()) {
+			// Create a comma-separated list of labels for the polyphonic output
+			polyOutputLabel = "";
+			for (size_t i = 0; i < labels.size(); ++i) {
+				if (i > 0) polyOutputLabel += "; "; // Add comma before each label except the first
+				polyOutputLabel += std::to_string(i + 1) + ":";
+				polyOutputLabel += labels[i];
+			}
+		}
+		configOutput(POLY_OUTPUT, polyOutputLabel);
+		
+		// Mono labels
 		for (size_t i = 0; i < labels.size(); ++i) {
 			configOutput(OUT01_OUTPUT + i, labels[i]);
 		}
@@ -490,6 +505,14 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 
 		outputs[POLY_OUTPUT].setChannels(16);
 		std::vector<StepData>& currentValues = steps[currentStep];
+		int activeChannels = 0;  // Variable to keep track of the last non-'U' channel
+		
+		// Determine the number of active channels
+		for (int i = 0; i < 16; i++) {
+			if (currentValues[i].type != 'U') {
+				activeChannels = i + 1;  // Last non-'U' channel index + 1
+			}
+		}
 
 		for (int i = 0; i < 16; i++) { // Use PORT_MAX_CHANNELS instead of 16?
 			StepData& step = currentValues[i];
@@ -526,8 +549,9 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 					break;
 			}
 			outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
-			outputs[POLY_OUTPUT].setVoltage(outputValue, i);
-			// To-do: Maybe setChannels() to removed unused columns? We can assume the first cell of type 'U' is the first unused column.
+			outputs[POLY_OUTPUT].setVoltage(outputValue, i); // I suppose we could skip unused columns to improve this
+			// Set the number of channels on the poly output to the number of active channels
+			outputs[POLY_OUTPUT].setChannels(activeChannels);
 			lastValues[i].voltage = outputValue;
 			lastValues[i].type = step.type;
 		}
