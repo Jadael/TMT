@@ -2,6 +2,9 @@
 #include "ports.hpp"
 
 #define GRID_SNAP 10.16 // A 2hp grid in millimeters. 1 GRID_SNAP is just the right spacing for adjacent ports on the module
+#define BLANKT_MIN_WIDTH 2
+#define BLANKT_DEFAULT_WIDTH 6
+#define BLANKT_MAX_WIDTH 96
 
 struct Blankt : Module {
 	enum ParamId {
@@ -17,11 +20,11 @@ struct Blankt : Module {
 		LIGHTS_LEN
 	};
 	
-	float width = 6; // Width in hp (RACK_GRID_WIDTH)
+	float width = BLANKT_DEFAULT_WIDTH; // Width in hp (RACK_GRID_WIDTH)
 
 	Blankt() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		width = 6;
+		width = BLANKT_DEFAULT_WIDTH;
 	}
 	
 	void fromJson(json_t* rootJ) override {
@@ -105,8 +108,8 @@ struct BlanktResizeHandle : OpaqueWidget {
 		Rect newBox = originalBox;
 		Rect oldBox = mw->box;
 		// Minimum and maximum number of holes we allow the module to be.
-		const float minWidth = 2 * RACK_GRID_WIDTH;
-		const float maxWidth = 96 * RACK_GRID_WIDTH;
+		const float minWidth = BLANKT_MIN_WIDTH * RACK_GRID_WIDTH;
+		const float maxWidth = BLANKT_MAX_WIDTH * RACK_GRID_WIDTH;
 		if (right) {
 			newBox.size.x += deltaX;
 			newBox.size.x = std::fmax(newBox.size.x, minWidth);
@@ -143,19 +146,32 @@ struct BlanktWidget : ModuleWidget {
 	BlanktWidget(Blankt* module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/blank.svg")));
-		box.size.x = 6 * RACK_GRID_WIDTH; // Default width (i.e. for browser
-		// We have to manually resize immediately because the SVG is the width of the max size panel, ready to be cropped
+		box.size.x = BLANKT_DEFAULT_WIDTH * RACK_GRID_WIDTH; // Default width (i.e. for browser
 		
-		if (module) {
-			box.size.x = module->width * RACK_GRID_WIDTH; // Storing width here lets all the widgets and Undo see it
-		} else {
-			box.size.x = 6 * RACK_GRID_WIDTH; // Default width (i.e. for browser
+		// We want to manually resize immediately because the SVG is the width of the max size panel, ready to be cropped, so createPanel() made us 96hp
+		// This also lets us match what's loaded from settings.json, if anything
+		// And the Rack Blank panel notes "resizing in the constructor helps avoid shoving modules around"
+		if (module) { // If the module is loaded
+			int oldWidth = module->width;
+			int newWidth = oldWidth;
+			box.size.x = module->width * RACK_GRID_WIDTH; // Match width from module
+			
+			while (newWidth >= BLANKT_MIN_WIDTH && !APP->scene->rack->requestModulePos(this, box.pos)) {
+				newWidth--; // Shrink until we either hit a valid box position, or min size
+				box.size.x = newWidth * RACK_GRID_WIDTH;
+			}
+			
+			if (newWidth != oldWidth) {
+				module->width = newWidth; // Push that back to the module
+			}
+		} else { // module is not loaded, like when showing the module in the module browser
+			box.size.x = BLANKT_DEFAULT_WIDTH * RACK_GRID_WIDTH; // default
 		}
 		
         // Load and position left brass element
         leftBrass = new SvgWidget();
         leftBrass->setSvg(Svg::load(asset::plugin(pluginInstance, "res/brass_left.svg")));
-        leftBrass->box.pos = Vec(0, 0); // Adjust position as needed
+        leftBrass->box.pos = Vec(0, 0); // Snap to the upper left corner, and assume the SVG is panel height
         addChild(leftBrass);
 
         // Load and position right brass element
@@ -165,7 +181,6 @@ struct BlanktWidget : ModuleWidget {
         addChild(rightBrass);
 		
 		// Resize bar on right.
-		//BlanktResizeHandle* rightHandle = createWidget<BlanktResizeHandle>(Vec(box.size.x - RACK_GRID_WIDTH, 0));
 		rightHandle = new BlanktResizeHandle;
 		rightHandle->box.pos.x = box.size.x - RACK_GRID_WIDTH; // Scoot to the right edge minus 1hp;
 		rightHandle->right = true;
@@ -182,10 +197,22 @@ struct BlanktWidget : ModuleWidget {
 		// I don't think it's currently worth the effort to ONLY call it then.
 		// And maybe the *first* time step() is called.
 		
+		// This whole section is exactly what the main widget also does when the module is created
 		if (module) { // If the module is loaded
-			box.size.x = module->width * RACK_GRID_WIDTH; // Get width from module
-		} else { // Like when showing the module in the module browser.
-			box.size.x = 6 * RACK_GRID_WIDTH; // Otherwise, default to 6hp
+			int oldWidth = module->width;
+			int newWidth = oldWidth;
+			box.size.x = module->width * RACK_GRID_WIDTH; // Match width from module
+			
+			while (newWidth >= BLANKT_MIN_WIDTH && !APP->scene->rack->requestModulePos(this, box.pos)) {
+				newWidth--; // Shrink until we either hit a valid box position, or min size
+				box.size.x = newWidth * RACK_GRID_WIDTH;
+			}
+			
+			if (newWidth != oldWidth) {
+				module->width = newWidth; // Push that back to the module
+			}
+		} else { // module is not loaded, like when showing the module in the module browser
+			box.size.x = BLANKT_DEFAULT_WIDTH * RACK_GRID_WIDTH; // default
 		}
 		
 		if (rightHandle && module) {
