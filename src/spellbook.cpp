@@ -403,13 +403,13 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 				
 				if (!cell.empty()) {
 					if (cell == "W" || cell == "|") {
-						stepData[index].voltage = 10.0f;
+						stepData[index].voltage = 10.0f; // Gates are 10v as far as the next cell should know
 						stepData[index].type = 'G';  // Full Width Gate (stay 10v the entire step)
 					} else if (cell == "T" || cell == "^") {
-						stepData[index].voltage = 10.0f;
+						stepData[index].voltage = 0.0f;// Triggers are 0v as far as the next cell should know
 						stepData[index].type = 'T';  // Trigger (1ms pulse)
 					} else if (cell == "X" || cell == "R" || cell == "_") {
-						stepData[index].voltage = 10.0f;
+						stepData[index].voltage = 10.0f; // Retriggers are 10v as far as the next cell should know
 						stepData[index].type = 'R';  // Gate with Retrigger (0v for 1ms at start of step, then 10v after)
 					} else {
 						stepData[index].voltage = parsePitch(cell);
@@ -426,7 +426,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		}
 
 		if (steps.empty()) {
-			steps.push_back(std::vector<StepData>(16, StepData{0.0f, 'N'}));
+			steps.push_back(std::vector<StepData>(16, StepData{0.0f, 'E'}));
 		}
 
 		currentStep = currentStep % steps.size();
@@ -516,7 +516,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 
 		for (int i = 0; i < 16; i++) { // Use PORT_MAX_CHANNELS instead of 16?
 			StepData& step = currentValues[i];
-			float outputValue = 0.f;  // Default 0v
+			float outputValue = lastValues[i].voltage;  // Default  to last known voltage
 
 			switch (step.type) {
 				case 'T':  // Trigger
@@ -539,13 +539,14 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 					outputValue = step.voltage;
 					break;
 				case 'E':  // Empty cells
-					outputValue = (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R') ? 0.0f : lastValues[i].voltage;
+					if (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R') {
+						outputValue = 0.0f;
+					}
 					break;
 				case 'U': // Unused cells
 					outputValue = 0.f;
 					break;
 				default:
-					outputValue = 0.f;
 					break;
 			}
 			outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
