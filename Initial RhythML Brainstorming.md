@@ -1,3 +1,6 @@
+My initial braindump of ideas and wishlist items for "Markdown-like, plain text CSV music notation" from 2024-04-14, copied from https://pastebin.com/Rna7zMYC
+- Trevor Hill-Hand
+
 ```
 0:  BassPitch,  BassGate,  MPitch,  MGate,  Kick,  Snare,  Hat,  Volume,    Comment
 1:  c2,         x,         e4,      x,      t,     ,       t,    10,
