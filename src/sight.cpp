@@ -3,7 +3,7 @@
 #include <deque>
 #include <cmath>
 
-#define SIGHT_BUFFER_SIZE 16384
+#define SIGHT_BUFFER_SIZE 8192
 
 struct Timer {
 	// There's probably something in dsp which could handle this better,
@@ -102,28 +102,37 @@ struct SightScope : LightWidget {
     int bufferSize = SIGHT_BUFFER_SIZE;
     std::deque<float> voltageBuffer;
     std::vector<float> scalingFactors; // Store precalculated scaling factors
+	std::vector<float> precomputedPositions; // Store precalculated scaled positions
+	bool dirty = true;
 	
     SightScope(Sight* module) {
         this->module = module;
         voltageBuffer.resize(bufferSize, 0.f); // Match module
         bufferSize = voltageBuffer.size(); // Match module
-        
-        // Precalculate scaling factors for each index
-        scalingFactors.resize(bufferSize);
-        for (int i = 0; i < bufferSize; ++i) {
-            scalingFactors[i] = std::log(i + 1) / std::log(bufferSize);
-        }
+		dirty = true;
     }
-    
-    float xPosition(float index) {
-        // Use a logarithmic scaling factor to compress the waveform towards the "new signal" end
-        return box.size.x - scalingFactors[index] * box.size.x;
-    }
+	
+	void precomputePositions() {
+		scalingFactors.resize(bufferSize);
+		precomputedPositions.resize(bufferSize);
+		for (int i = 0; i < bufferSize; ++i) {
+			scalingFactors[i] = std::log2(i + 1) / std::log2(bufferSize);
+			precomputedPositions[i] = (box.size.x - scalingFactors[i] * box.size.x) * 1.5f;
+		}
+		dirty = false;
+	}
+	
+	void step() override {
+		
+	}
+	
     
     void drawLight(const DrawArgs& args) override {
         if (!module) {
             return;
         }
+		
+		if (dirty) precomputePositions();
         
         // Safely access the voltageBufferCopy from Sight module
         {
@@ -131,44 +140,65 @@ struct SightScope : LightWidget {
             voltageBuffer = module->voltageBufferCopy;
         }
         
-        nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
-        
-        // Draw the input voltages in the buffer
-        for (int i = 0; i < bufferSize - 1; i++) {
-            // Calculate the thickness for this segment and the next segment
-            float thicknessStart = 4.f * (1.f - scalingFactors[i]);
-            float thicknessEnd = 2.f * (1.f - scalingFactors[i + 1]);
-            
-            // Begin a new path for each segment
-            nvgBeginPath(args.vg);
-            nvgMoveTo(args.vg, xPosition(i), box.size.y - rescale(voltageBuffer[i], -10.f, 10.f, 0.f, box.size.y));
-            nvgLineTo(args.vg, xPosition(i + 1), box.size.y - rescale(voltageBuffer[i + 1], -10.f, 10.f, 0.f, box.size.y));
-            
-            // Set the line thickness for this segment
-            nvgStrokeWidth(args.vg, thicknessStart);
-            
-            // Stroke the segment
-            nvgStrokeColor(args.vg, nvgRGBA(254, 201, 1, 255));
-            nvgStroke(args.vg);
-            
-            // Set the line thickness for the next segment
-            nvgStrokeWidth(args.vg, thicknessEnd);
-        }
-        
-        // Draw the last segment (to ensure the thickness is applied)
-        nvgBeginPath(args.vg);
-        nvgMoveTo(args.vg, xPosition(bufferSize - 1), box.size.y - rescale(voltageBuffer[bufferSize - 1], -10.f, 10.f, 0.f, box.size.y));
-        nvgLineTo(args.vg, xPosition(bufferSize - 1), box.size.y - rescale(voltageBuffer[bufferSize - 1], -10.f, 10.f, 0.f, box.size.y));
-        nvgStroke(args.vg);
-        
-        nvgResetScissor(args.vg);
-    }
+		nvgScissor(args.vg, args.clipBox.pos.x, args.clipBox.pos.y, args.clipBox.size.x, args.clipBox.size.y);
+		
+
+		
+		// Draw the input voltages in the buffer
+		for (int i = 0; i < bufferSize - 1; i++) {
+			// Calculate the thickness for this segment and the next segment
+			float thicknessStart = 3.f * (1.f - scalingFactors[i]);
+			float thicknessEnd = 3.f * (1.f - scalingFactors[i + 1]);
+			float position1 = precomputedPositions[i];
+			float position2 = precomputedPositions[i + 1];
+			
+			// Begin a new path for each segment
+			nvgBeginPath(args.vg);
+			nvgMoveTo(args.vg, position1, box.size.y - rescale(voltageBuffer[i], -10.f, 10.f, 0.f, box.size.y));
+			nvgLineTo(args.vg, position2, box.size.y - rescale(voltageBuffer[i + 1], -10.f, 10.f, 0.f, box.size.y));
+			
+			// Set the line thickness for this segment
+			nvgStrokeWidth(args.vg, thicknessStart);
+			
+			// Stroke the segment
+			nvgStrokeColor(args.vg, nvgRGBA(254, 201, 1, 255));
+			nvgStroke(args.vg);
+			
+			// Set the line thickness for the next segment
+			nvgStrokeWidth(args.vg, thicknessEnd);
+
+			// Draw a dot at the start of the current segment
+			nvgBeginPath(args.vg);
+			nvgCircle(args.vg, position1, box.size.y - rescale(voltageBuffer[i], -10.f, 10.f, 0.f, box.size.y), thicknessStart / 2);
+			nvgFillColor(args.vg, nvgRGBA(254, 201, 1, 255));
+			nvgFill(args.vg);
+		}
+		
+		float position3 = precomputedPositions[bufferSize - 1];
+		
+		// Draw the last segment (to ensure the thickness is applied)
+		nvgBeginPath(args.vg);
+		nvgMoveTo(args.vg, position3, box.size.y - rescale(voltageBuffer[bufferSize - 1], -10.f, 10.f, 0.f, box.size.y));
+		nvgLineTo(args.vg, position3, box.size.y - rescale(voltageBuffer[bufferSize - 1], -10.f, 10.f, 0.f, box.size.y));
+		nvgStroke(args.vg);
+
+		// Draw a dot at the last sample
+		nvgBeginPath(args.vg);
+		float thicknessLast = 4.f * (1.f - scalingFactors[bufferSize - 1]);
+		nvgCircle(args.vg, position3, box.size.y - rescale(voltageBuffer[bufferSize - 1], -10.f, 10.f, 0.f, box.size.y), thicknessLast / 2);
+		nvgFillColor(args.vg, nvgRGBA(254, 201, 1, 255));
+		nvgFill(args.vg);
+		
+		nvgResetScissor(args.vg);
+	}
 };
 
 struct SightWidget : ModuleWidget {
 	SightWidget(Sight* module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/sight.svg")));
+		
+		addParam(createParamCentered<BrassToggle>(Vec(box.size.x/2, mm2px(6)), module, Sight::TOGGLE_SWITCH));
 		
 		SightScope* diagram = new SightScope(module);
 		diagram->box.pos = Vec(15, 30);
