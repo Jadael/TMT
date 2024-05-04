@@ -212,7 +212,6 @@ struct StatsWidget : ModuleWidget {
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/stats.svg")));
 		
 		addParam(createParamCentered<BrassToggle>(mm2px(Vec(15, 6)), module, Stats::TOGGLE_SWITCH));
-		// Right now this doesn't do anything, but presumably we'll encounter something fun and esoteric for this module's "B Side" to do
 		
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*1.5)), module, Stats::POLY_INPUT));
 		// The input will be the upper leftmost port, and I think we could fit a column of 10 below it, with either labels to the right, or a second column of outputs if we can think of that many different stats to output
