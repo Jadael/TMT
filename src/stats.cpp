@@ -216,15 +216,15 @@ struct StatsWidget : ModuleWidget {
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*1.5)), module, Stats::POLY_INPUT));
 		// The input will be the upper leftmost port, and I think we could fit a column of 10 below it, with either labels to the right, or a second column of outputs if we can think of that many different stats to output
 		
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*2.5)), module, Stats::MEAN_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*3.5)), module, Stats::MEDIAN_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*4.5)), module, Stats::MODE_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*5.5)), module, Stats::GEOMETRIC_MEAN_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*6.5)), module, Stats::PRODUCT_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*7.5)), module, Stats::COUNT_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*8.5)), module, Stats::SUM_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*9.5)), module, Stats::ASCENDING_OUTPUT));
-		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*10.5)), module, Stats::DISTINCT_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*3)), module, Stats::MEAN_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*4)), module, Stats::MEDIAN_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*5)), module, Stats::MODE_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*6)), module, Stats::GEOMETRIC_MEAN_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*7)), module, Stats::PRODUCT_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*8)), module, Stats::COUNT_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*9)), module, Stats::SUM_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*10)), module, Stats::ASCENDING_OUTPUT));
+		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*11)), module, Stats::DISTINCT_OUTPUT));
 	}
 };
 
