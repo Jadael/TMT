@@ -78,8 +78,6 @@ struct Sort : Module {
 		timeSinceUpdate.update(args.sampleTime); // Advance the timer
 		
 		if (!inputs[DATA_INPUT].isConnected()) {
-			// Set all outputs to a single channel of 0v if no Data input is present
-			// TODO: Skip processing if the input hasn't *changed*? Otherwise even this sits here zeroing every output every sample on idle
 			for (int i = 0; i < OUTPUTS_LEN; ++i) {
 				outputs[i].setChannels(1);
 				outputs[i].setVoltage(0.0f, 0);
@@ -87,31 +85,87 @@ struct Sort : Module {
 			return; // Exit early if there's no input
 		}
 		
-		// Check the timer/toggle for processing rate
 		if (!timeSinceUpdate.check(0.01f) && params[TOGGLE_SWITCH].getValue() < 0.5f) {
 			return; // Break early if we haven't reached our throttle time, unless we're in Alt mode
 		}
 		
-		timeSinceUpdate.reset(); // Reset the timer, since we're about to re-process
+		timeSinceUpdate.reset(); // Reset the timer
+
+		int maxChannels = std::max({inputs[DATA_INPUT].getChannels(), inputs[SORT_INPUT].getChannels(), inputs[SELECT_INPUT].getChannels()});
 		
-		// Logic here --------
-		// Be wary: any inputs might be disconnected, or have different numbers of channels
-		// The "SORT" and "SELECT" columns should be padded with repeats to reach the size of longer DATA inputs, or extra items can be ignored for shorter ones
-		// Getting or setting channels that don't exist can cause crashes
-		// However, we DO want to SAFELY grow/shrink outputs to match the final sizes of the data sets that output is being given
-		
-		// Get inputs, safely handle their sizes, and read them into our three "columns"
-		
-		// Output the appropriate "Excel style queries" needed for each output
-		
-		// Update and size each output, safely and efficiently
+		std::vector<float> dataValues(maxChannels);
+		std::vector<float> sortValues(maxChannels);
+		std::vector<float> selectValues(maxChannels);
+
+		for (int i = 0; i < maxChannels; i++) {
+			dataValues[i] = inputs[DATA_INPUT].getVoltage(i);
+			sortValues[i] = inputs[SORT_INPUT].isConnected() ? inputs[SORT_INPUT].getVoltage(i) : 0.0f;
+			selectValues[i] = inputs[SELECT_INPUT].isConnected() ? inputs[SELECT_INPUT].getVoltage(i) : 0.0f;
+		}
+
+		// Create a sorting index based on sortValues
+		std::vector<int> index(maxChannels);
+		std::iota(index.begin(), index.end(), 0);
+		std::stable_sort(index.begin(), index.end(), [&sortValues](int i, int j) { return sortValues[i] < sortValues[j]; });
+
+		// Apply sort to dataValues
+		std::vector<float> sortedData(maxChannels);
+		for (int i = 0; i < maxChannels; i++) {
+			sortedData[i] = dataValues[index[i]];
+		}
+
+		// Apply selection
+		std::vector<float> selectedData;
+		std::vector<int> selectedIndex;
+		for (int i = 0; i < maxChannels; i++) {
+			if (selectValues[i] > 5.0f) {
+				selectedData.push_back(dataValues[i]);
+				selectedIndex.push_back(index[i]);
+			}
+		}
+
+		// Sort selected data
+		std::vector<float> sortedSelectedData(selectedIndex.size());
+		for (size_t i = 0; i < selectedIndex.size(); i++) {
+			sortedSelectedData[i] = dataValues[selectedIndex[i]];
+		}
+		std::stable_sort(sortedSelectedData.begin(), sortedSelectedData.end());
+
+		// Ascending and Descending sorting of dataValues
+		std::vector<float> ascendingData = dataValues;
+		std::sort(ascendingData.begin(), ascendingData.end());
+		std::vector<float> descendingData = ascendingData; // Copy already sorted data
+		std::reverse(descendingData.begin(), descendingData.end()); // Reverse for descending order
+
+		// Outputs
+		outputs[PASSTHRU_OUTPUT].setChannels(maxChannels);
+		outputs[SORTED_OUTPUT].setChannels(maxChannels);
+		outputs[SELECTED_OUTPUT].setChannels(selectedData.size());
+		outputs[SORTED_AND_SELECTED_OUTPUT].setChannels(selectedData.size());
+		outputs[SELECTED_AND_SORTED_OUTPUT].setChannels(sortedSelectedData.size());
+		outputs[ASCENDING_OUTPUT].setChannels(maxChannels);
+		outputs[DESCENDING_OUTPUT].setChannels(maxChannels);
+
+		for (int i = 0; i < maxChannels; i++) {
+			outputs[PASSTHRU_OUTPUT].setVoltage(dataValues[i], i);
+			outputs[SORTED_OUTPUT].setVoltage(sortedData[i], i);
+			outputs[ASCENDING_OUTPUT].setVoltage(ascendingData[i], i);
+			outputs[DESCENDING_OUTPUT].setVoltage(descendingData[i], i);
+		}
+		for (size_t i = 0; i < selectedData.size(); i++) {
+			outputs[SELECTED_OUTPUT].setVoltage(selectedData[i], i);
+			outputs[SORTED_AND_SELECTED_OUTPUT].setVoltage(selectedData[i], i);
+		}
+		for (size_t i = 0; i < sortedSelectedData.size(); i++) {
+			outputs[SELECTED_AND_SORTED_OUTPUT].setVoltage(sortedSelectedData[i], i);
+		}
 	}
 };
 
 struct SortWidget : ModuleWidget {
 	SortWidget(Sort* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/stats.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/sort.svg")));
 		
 		// CONTROLS --------
 		addParam(createParamCentered<BrassToggle>(mm2px(Vec(15, 6)), module, Sort::TOGGLE_SWITCH));
