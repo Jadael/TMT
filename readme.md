@@ -257,5 +257,35 @@ Stats is a statistical function module. It computes and outputs various statisti
 
 ---
 
+# Sort
+![Sort](screenshots/sort.png)
+
+Sort manipulates a polyphonic signal based on sorting criteria specified by another polyphonic input, and selectively outputs the channels based on a voltage threshold from a third input.
+
+- Polyphonic data sorting based on external polyphonic sort keys.
+- Channel selection based on voltage threshold.
+- Outputs multiple combinations of sorted and selected data.
+
+## Inputs & Outputs
+- **Data Input**: Polyphonic signal containing the data to be sorted.
+- **Sort Input**: Polyphonic signal that determines the order of sorting for the Data input.
+- **Select Input**: Polyphonic signal that determines which channels of the Data input are included in the output, based on a threshold voltage (e.g., channels with voltages above 5V are included).
+
+## Outputs
+- **Passthru Output**: Outputs the Data input as is, without any sorting or selection.
+- **Sorted Output**: Outputs the Data input sorted according to the Sort input.
+- **Selected Output**: Outputs only the channels of the Data input that meet the threshold criteria set by the Select input.
+- **Sorted and Selected Output**: First sorts the Data input as per the Sort input, then applies the selection criteria from the Select input.
+- **Selected and Sorted Output**: First applies the selection criteria from the Select input to the Data input, then sorts the resulting channels as per the Sort input.
+- **Ascending Output**: Outputs the channels of the Data input sorted in ascending order based on their own values.
+- **Descending Output**: Outputs the channels of the Data input sorted in descending order based on their own values.
+
+## Usage
+1. Connect polyphonic cables to the Data, Sort, and Select inputs.
+2. Adjust the selection threshold using the Select input where required (e.g., set voltages above 5V to include a channel in the output).
+3. Monitor the various outputs to utilize the sorted and/or selected data in your patches.
+
+---
+
 ## License
 This project is licensed under the MIT License. See the [license.txt](license.txt) file for more information.
