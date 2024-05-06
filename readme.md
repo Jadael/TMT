@@ -13,6 +13,7 @@ A collection of esoteric modules mostly focused around manipulating RNG and poly
 - [Sight](#sight) - A screen-rate scope where time slows down over the width of the scope.
 - [Spellbook](#spellbook) - Plain text sequencing.
 - [Stats](#stats) - Get statistical measures like mean, median, mode, etc. of a polyphonic signal.
+- [Sort](#sort) - Sort and select channels from a polyphonic input using other CV inputs.
 
 # Shuffle
 ![Shuffle](screenshots/shuffle.png)
