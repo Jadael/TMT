@@ -1,7 +1,8 @@
 # T's Musical Tools
 A collection of esoteric modules mostly focused around manipulating RNG and polyphonic signals in useful ways.
 
-- [VCV Rack Library plugin page](https://library.vcvrack.com/TMT)
+- Download from the [VCV Rack Library plugin page](https://library.vcvrack.com/TMT)
+- Check [Releases](https://github.com/Jadael/TMT/releases) to [install the latest preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins)
 
 ## Table of Contents
 - [Shuffle](#shuffle) - Reorder the channels of a polyphonic signal.
@@ -130,7 +131,7 @@ A real-time, logarithmic scope. Time is shown non-linearly, letting you see a bo
 # Spellbook
 ![Spellbook](screenshots/spellbook.png)
 
-Spellbook is a module to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs (and a polyphonic output which combines all of them), each of which outputs a voltage determined by the corresponding column in RhythML-formatted text input. Spellbook is not yet in the VCV Rack Library version of this plugin; check [Releases](https://github.com/Jadael/TMT/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
+Spellbook is a module to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs (and a polyphonic output which combines all of them), each of which outputs a voltage determined by the corresponding column in RhythML-formatted text input.
 
 ## Inputs & Outputs
 - **Step Forward**: Advances to the next step in the sequence on the rising edge of a trigger.
@@ -234,7 +235,7 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 # Stats
 ![Stats](screenshots/stats.png)
 
-Stats is a statistical function module. It computes and outputs various statistical metrics from the signals of a polyphonic input cable. Stats is not yet in the VCV Rack Library version of this plugin; check [Releases](https://github.com/Jadael/TMT/releases) to [install the preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins).
+Stats is a statistical function module. It computes and outputs various statistical metrics from the signals of a polyphonic input cable.
 
 ## Inputs & Outputs
 - **Toggle Audio Rate**: By default, Stats recalculates every 10ms. Toggle this to run at audio rate, which is pretty CPU heavy.
