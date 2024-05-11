@@ -6,27 +6,17 @@
 struct Timer {
 	// There's probably something in dsp which could handle this better,
 	// it was just easier to conceptualize as a simple "time since reset" which I can check however I want
-    float timePassed = 0.0f;  // Time since timer start in seconds
+	float timePassed = 0.0f;  // Time since timer start in seconds
 
-    void reset() { // Start timer at 0 on resets
-        timePassed = 0.0f; 
-    }
-	
-	void set(float seconds) { // Set the timer to something specific
-		timePassed = seconds;
-	}
-    
-    void update(float deltaTime) { // Update the timer and check if the period has expired
-        timePassed += deltaTime;
-    }
-	
-	float time() {// Return seconds since timer start
-		return timePassed;
-	}
-	
-	bool check(float seconds) { // Return whether it's been at least <seconds> since the timer started
-		return timePassed >= seconds;
-	}
+	void reset() { timePassed = 0.0f; } // Set timer at 0 on resets
+
+	void set(float seconds) { timePassed = seconds; } // Set the timer to something specific
+
+	void update(float deltaTime) { timePassed += deltaTime; } // Update the timer and check if the period has expired
+
+	float time() { return timePassed; } // Return seconds since timer start
+
+	bool check(float seconds) { return timePassed >= seconds; } // Return whether it's been at least <seconds> since the timer started
 };
 
 struct Sort : Module {
@@ -55,14 +45,14 @@ struct Sort : Module {
 	};
 	
 	Timer timeSinceUpdate;
-	// Put some sort of "three column" data structure here we can update and manipulate extremely efficiently (i.e. hopefully at audio-rate >=48kHz)
 
 	Sort() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode: Process at audio rate (CPU heavy)");
 		configInput(DATA_INPUT, "Polyphonic Data");
-		configInput(SORT_INPUT, "Ordering");
-		configInput(SELECT_INPUT, "Selection");
+		configInput(SORT_INPUT, "Polyphonic Sort Key");
+		inputInfos[SORT_INPUT]->description = "Data will be sorted based on the values of the sort key.";
+		configInput(SELECT_INPUT, "Polyphonic Select Key");
 		configOutput(PASSTHRU_OUTPUT, "Pass through data");
 		configOutput(SORTED_OUTPUT, "Sorted data");
 		configOutput(SELECTED_OUTPUT, "Selected data");
@@ -73,14 +63,12 @@ struct Sort : Module {
 		timeSinceUpdate.reset();
 	}
 	
-	
 	void process(const ProcessArgs& args) override {
 		timeSinceUpdate.update(args.sampleTime); // Advance the timer
 		
 		if (!inputs[DATA_INPUT].isConnected()) {
 			for (int i = 0; i < OUTPUTS_LEN; ++i) {
-				outputs[i].setChannels(1);
-				outputs[i].setVoltage(0.0f, 0);
+				outputs[i].setChannels(0); // Ensure no output
 			}
 			return; // Exit early if there's no input
 		}
@@ -91,7 +79,7 @@ struct Sort : Module {
 		
 		timeSinceUpdate.reset(); // Reset the timer
 
-		int maxChannels = std::max({inputs[DATA_INPUT].getChannels(), inputs[SORT_INPUT].getChannels(), inputs[SELECT_INPUT].getChannels()});
+		int maxChannels = inputs[DATA_INPUT].getChannels();
 		
 		std::vector<float> dataValues(maxChannels);
 		std::vector<float> sortValues(maxChannels);
@@ -101,6 +89,23 @@ struct Sort : Module {
 			dataValues[i] = inputs[DATA_INPUT].getVoltage(i);
 			sortValues[i] = inputs[SORT_INPUT].isConnected() ? inputs[SORT_INPUT].getVoltage(i) : 0.0f;
 			selectValues[i] = inputs[SELECT_INPUT].isConnected() ? inputs[SELECT_INPUT].getVoltage(i) : 0.0f;
+		}
+
+		// Ascending and Descending sorting of dataValues
+		std::vector<float> ascendingData = dataValues;
+		std::sort(ascendingData.begin(), ascendingData.end());
+		std::vector<float> descendingData = ascendingData; // Copy already sorted data
+		std::reverse(descendingData.begin(), descendingData.end()); // Reverse for descending order
+
+		// Outputs
+		outputs[PASSTHRU_OUTPUT].setChannels(maxChannels);
+		outputs[ASCENDING_OUTPUT].setChannels(maxChannels);
+		outputs[DESCENDING_OUTPUT].setChannels(maxChannels);
+
+		for (int i = 0; i < maxChannels; i++) {
+			outputs[PASSTHRU_OUTPUT].setVoltage(dataValues[i], i);
+			outputs[ASCENDING_OUTPUT].setVoltage(ascendingData[i], i);
+			outputs[DESCENDING_OUTPUT].setVoltage(descendingData[i], i);
 		}
 
 		// Create a sorting index based on sortValues
@@ -113,53 +118,48 @@ struct Sort : Module {
 		for (int i = 0; i < maxChannels; i++) {
 			sortedData[i] = dataValues[index[i]];
 		}
+		
+		outputs[SORTED_OUTPUT].setChannels(maxChannels);
+		for (int i = 0; i < maxChannels; i++) {
+			outputs[SORTED_OUTPUT].setVoltage(sortedData[i], i);
+		}
 
 		// Apply selection
 		std::vector<float> selectedData;
-		std::vector<int> selectedIndex;
 		for (int i = 0; i < maxChannels; i++) {
-			if (selectValues[i] > 5.0f) {
+			if (selectValues[i] >= 1.0f) {
 				selectedData.push_back(dataValues[i]);
-				selectedIndex.push_back(index[i]);
 			}
 		}
 
-		// Sort selected data
-		std::vector<float> sortedSelectedData(selectedIndex.size());
-		for (size_t i = 0; i < selectedIndex.size(); i++) {
-			sortedSelectedData[i] = dataValues[selectedIndex[i]];
-		}
-		std::stable_sort(sortedSelectedData.begin(), sortedSelectedData.end());
-
-		// Ascending and Descending sorting of dataValues
-		std::vector<float> ascendingData = dataValues;
-		std::sort(ascendingData.begin(), ascendingData.end());
-		std::vector<float> descendingData = ascendingData; // Copy already sorted data
-		std::reverse(descendingData.begin(), descendingData.end()); // Reverse for descending order
-
-		// Outputs
-		outputs[PASSTHRU_OUTPUT].setChannels(maxChannels);
-		outputs[SORTED_OUTPUT].setChannels(maxChannels);
 		outputs[SELECTED_OUTPUT].setChannels(selectedData.size());
-		outputs[SORTED_AND_SELECTED_OUTPUT].setChannels(selectedData.size());
-		outputs[SELECTED_AND_SORTED_OUTPUT].setChannels(sortedSelectedData.size());
-		outputs[ASCENDING_OUTPUT].setChannels(maxChannels);
-		outputs[DESCENDING_OUTPUT].setChannels(maxChannels);
-
-		for (int i = 0; i < maxChannels; i++) {
-			outputs[PASSTHRU_OUTPUT].setVoltage(dataValues[i], i);
-			outputs[SORTED_OUTPUT].setVoltage(sortedData[i], i);
-			outputs[ASCENDING_OUTPUT].setVoltage(ascendingData[i], i);
-			outputs[DESCENDING_OUTPUT].setVoltage(descendingData[i], i);
-		}
 		for (size_t i = 0; i < selectedData.size(); i++) {
 			outputs[SELECTED_OUTPUT].setVoltage(selectedData[i], i);
-			outputs[SORTED_AND_SELECTED_OUTPUT].setVoltage(selectedData[i], i);
 		}
+
+		// Sort the data, then select
+		std::vector<float> sortedSelectedData;
+		for (int i = 0; i < maxChannels; i++) {
+			if (selectValues[index[i]] >= 1.0f) {
+				sortedSelectedData.push_back(sortedData[i]);
+			}
+		}
+
+		outputs[SORTED_AND_SELECTED_OUTPUT].setChannels(sortedSelectedData.size());
 		for (size_t i = 0; i < sortedSelectedData.size(); i++) {
-			outputs[SELECTED_AND_SORTED_OUTPUT].setVoltage(sortedSelectedData[i], i);
+			outputs[SORTED_AND_SELECTED_OUTPUT].setVoltage(sortedSelectedData[i], i);
+		}
+
+		// Select data, then sort it
+		std::vector<float> selectedAndSortedData = selectedData;
+		std::sort(selectedAndSortedData.begin(), selectedAndSortedData.end());
+
+		outputs[SELECTED_AND_SORTED_OUTPUT].setChannels(selectedAndSortedData.size());
+		for (size_t i = 0; i < selectedAndSortedData.size(); i++) {
+			outputs[SELECTED_AND_SORTED_OUTPUT].setVoltage(selectedAndSortedData[i], i);
 		}
 	}
+
 };
 
 struct SortWidget : ModuleWidget {
@@ -167,29 +167,29 @@ struct SortWidget : ModuleWidget {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/sort.svg")));
 		
-		// CONTROLS --------
+	// CONTROLS --------
 		addParam(createParamCentered<BrassToggle>(mm2px(Vec(15, 6)), module, Sort::TOGGLE_SWITCH));
 		// Toggle between sample rate and throttled rate
 		
-		// INPUTS --------
+	// INPUTS --------
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*1.5)), module, Sort::DATA_INPUT));
 		// The polyphonic cable we are treating like our "data column"
 		
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*2.5)), module, Sort::SORT_INPUT));
-		// The polyphonic cable we are treating as our "index" or "ordering key column"
+		// The polyphonic cable we are treating as our "sort key' (as in "index" or "ordering")
 		
 		addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*3.5)), module, Sort::SELECT_INPUT));
-		// The polyphonic cable we are treating as our "crtieria" or "mask column"
+		// The polyphonic cable we are treating as our "select key" (as in "mask" or database-style "filter")
 		
-		// OUTPUTS --------
+	// OUTPUTS --------
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*5)), module, Sort::PASSTHRU_OUTPUT));
 		// Pass through DATA_INPUT as-is
 		
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*6)), module, Sort::SORTED_OUTPUT));
-		// Use as the "index" or "sort key" when sorting data (i.e. for an Excel style rank() index)
+		// Use as the "index" or "key" when sorting data (like an Excel style rank() )
 		
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*7)), module, Sort::SELECTED_OUTPUT));
-		// As as a "criteria" or "mask" for data - unselected channells are removed from the output set, not just muted (i.e. for an Excel style filter() criteria, where these voltages are treated like booleans)
+		// Unselected channels are removed from the output set, not just muted, with the select key treated like booleans)
 		
 		addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*8)), module, Sort::SORTED_AND_SELECTED_OUTPUT));
 		// Sort the data according to the key, THEN apply the selection, and output a set of channels size to that new set
