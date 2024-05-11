@@ -25,11 +25,21 @@ struct Shuffle : Module {
 	Shuffle() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Allow duplicate channels");
+
 		configInput(TRIGGER_INPUT, "Shuffle Trigger");
-		configInput(POLYPHONIC_PITCH_INPUT, "Poly In");
+		inputInfos[TRIGGER_INPUT]->description = "Triggers a re-shuffle of input channels whenever a rising edge is detected on this input.";
+
+		configInput(POLYPHONIC_PITCH_INPUT, "Polyphonic Input");
+		inputInfos[POLYPHONIC_PITCH_INPUT]->description = "The main polyphonic input for the pitch voltages that you want to shuffle. \nAccepts up to 16 channels.";
+
 		configInput(SEED_INPUT, "Seed");
-		configInput(OUTPUT_CHANNELS_INPUT, "Number of Output Channels (0v 'one', to 10v 'all')");
-		configOutput(REORDERED_PITCH_OUTPUT, "Poly Out");
+		inputInfos[SEED_INPUT]->description = "Optional input for a voltage that determines the random seed used for shuffling. \nA stable voltage leads to a consistent shuffling pattern.";
+
+		configInput(OUTPUT_CHANNELS_INPUT, "Output Channels Control");
+		inputInfos[OUTPUT_CHANNELS_INPUT]->description = "Controls the number of active output channels. \nExpect voltages from 0V (one output) to 10V (all inputs are used as outputs).";
+
+		configOutput(REORDERED_PITCH_OUTPUT, "Polyphonic Output");
+		outputInfos[REORDERED_PITCH_OUTPUT]->description = "The output after shuffling the input pitch voltages. \nThe number of active channels here is set by the 'Output Channels Control' input.";
 	}
 	
 	dsp::SchmittTrigger trigger;

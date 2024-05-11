@@ -48,20 +48,54 @@ struct Sort : Module {
 
 	Sort() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode: Process at audio rate (CPU heavy)");
-		configInput(DATA_INPUT, "Polyphonic Data");
-		configInput(SORT_INPUT, "Polyphonic Sort Key");
-		inputInfos[SORT_INPUT]->description = "Data will be sorted based on the values of the sort key.";
-		configInput(SELECT_INPUT, "Polyphonic Select Key");
-		configOutput(PASSTHRU_OUTPUT, "Pass through data");
-		configOutput(SORTED_OUTPUT, "Sorted data");
-		configOutput(SELECTED_OUTPUT, "Selected data");
-		configOutput(SORTED_AND_SELECTED_OUTPUT, "Sorted then selected data");
-		configOutput(SELECTED_AND_SORTED_OUTPUT, "Selected then sorted data");
-		configOutput(ASCENDING_OUTPUT, "Ascending sorted data");
-		configOutput(DESCENDING_OUTPUT, "Descending sorted data");
+		// Configures the toggle switch parameter that determines the processing mode of the module.
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode", "Process at audio rate if active, otherwise throttle updates. This mode is CPU heavy when active.");
+		
+		// Configures the inputs and outputs with descriptions for each port.
+		
+		// Data Input - This is the main data input for the module, where you send the signal you want to process.
+		configInput(DATA_INPUT, "Data Input");
+		inputInfos[DATA_INPUT]->description = "Main polyphonic input for the data you want to sort or select.\nConnect the signal that contains the data you wish to manipulate.";
+
+		// Sort Input - This port takes the sort key used to determine the order of data.
+		configInput(SORT_INPUT, "Sort Key");
+		inputInfos[SORT_INPUT]->description = "Polyphonic input for the sort key.\nConnect a signal here to determine the order in which data is sorted.\nData connected to 'Data Input' will be sorted based on the values from this input.";
+
+		// Select Input - This port reads the select key which determines which data points are outputted.
+		configInput(SELECT_INPUT, "Select Key");
+		inputInfos[SELECT_INPUT]->description = "Polyphonic input for the select key.\nConnect a signal here to determine which data points are included in the output.\nData points with corresponding 'Select Key' values of 1.0v or higher will be considered 'selected'.";
+
+		// Passthrough Output - Directly outputs the data received at the Data Input without any modifications.
+		configOutput(PASSTHRU_OUTPUT, "Passthrough Output");
+		outputInfos[PASSTHRU_OUTPUT]->description = "Outputs the data received at the 'Data Input' directly without any modifications.";
+
+		// Sorted Output - Outputs data sorted based on the values of the Sort Key.
+		configOutput(SORTED_OUTPUT, "Sorted Output");
+		outputInfos[SORTED_OUTPUT]->description = "Outputs data sorted based on the 'Sort Key'.\nThe data from 'Data Input' is rearranged into a new order determined by the values at 'Sort Key' input, sorted from lowest to highest.";
+
+		// Selected Output - Outputs only the data points that are 'selected' by the Select Key.
+		configOutput(SELECTED_OUTPUT, "Selected Output");
+		outputInfos[SELECTED_OUTPUT]->description = "Outputs only the data points from 'Data Input' that are 'selected' by the 'Select Key'.\nA data point is included in this output if its corresponding 'Select Key' value is 1.0v or higher.";
+
+		// Sorted and Selected Output - Data is first sorted by the Sort Key, then filtered by the Select Key.
+		configOutput(SORTED_AND_SELECTED_OUTPUT, "Sorted, then Selected Output");
+		outputInfos[SORTED_AND_SELECTED_OUTPUT]->description = "Outputs data that is first sorted by the 'Sort Key' and then filtered by the 'Select Key'.\nThe data is first arranged based on the sorting key, and then only the selected data (where 'Select Key' >= 1.0v) is output.";
+
+		// Selected and Sorted Output - Data is first filtered by the Select Key, then sorted by the Sort Key.
+		configOutput(SELECTED_AND_SORTED_OUTPUT, "Selected, then Sorted Output");
+		outputInfos[SELECTED_AND_SORTED_OUTPUT]->description = "Outputs data that is first filtered by the 'Select Key' and then sorted by the 'Sort Key'.\nThe data is first reduced to only include the selected channels, and then that subset is sorted based on the sorting key.";
+
+		// Ascending Output - Outputs data sorted in ascending order, ignoring the Sort Key.
+		configOutput(ASCENDING_OUTPUT, "Ascending Output");
+		outputInfos[ASCENDING_OUTPUT]->description = "Outputs data sorted in ascending order based on its own values, ignoring the 'Sort Key'.\nThis is a simple ascending sort of the 'Data Input'.";
+
+		// Descending Output - Outputs data sorted in descending order, ignoring the Sort Key.
+		configOutput(DESCENDING_OUTPUT, "Descending Output");
+		outputInfos[DESCENDING_OUTPUT]->description = "Outputs data sorted in descending order based on its own values, ignoring the 'Sort Key'.\nThis is a simple descending sort of the 'Data Input'.";
+
 		timeSinceUpdate.reset();
 	}
+
 	
 	void process(const ProcessArgs& args) override {
 		timeSinceUpdate.update(args.sampleTime); // Advance the timer

@@ -23,12 +23,29 @@ struct Ouroboros : Module {
 
 	Ouroboros() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Average current and next step");
-		configInput(POLY_SEQUENCE_INPUT, "Source polyphonic signal to step through");
-		configInput(CLOCK_INPUT, "Clock");
-		configInput(RESET_INPUT, "Reset");
-		configInput(LENGTH_INPUT, "Sequence length (0v: one step, 10v: all steps)");
-		configOutput(MONO_SEQUENCE_OUTPUT, "Mono sequence");
+
+		// Toggle Switch Parameter
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode: Output average of current and next step");
+
+		// Polyphonic Sequence Input
+		configInput(POLY_SEQUENCE_INPUT, "Polyphonic Sequence Input");
+		inputInfos[POLY_SEQUENCE_INPUT]->description = "This polyphonic input accepts multiple channels, each representing a step in the sequence. The module steps through these channels based on the clock input.";
+
+		// Clock Input
+		configInput(CLOCK_INPUT, "Clock Input");
+		inputInfos[CLOCK_INPUT]->description = "This input expects a clock signal. On each rising edge of this signal, the module advances to the next step in the sequence.";
+
+		// Reset Input
+		configInput(RESET_INPUT, "Reset Input");
+		inputInfos[RESET_INPUT]->description = "A rising edge on this input resets the sequence to the first step. If a rising edge is received while the clock input is high, the reset will occur on the next clock's rising edge.";
+
+		// Sequence Length Input
+		configInput(LENGTH_INPUT, "Sequence Length Input");
+		inputInfos[LENGTH_INPUT]->description = "This input controls the number of active steps in the sequence. A voltage of 0V means only the first step is active. A voltage of 10V means ALL connected channels. Intermediate voltages scale linearly between 1 and the number of connected channels.";
+
+		// Mono Sequence Output
+		configOutput(MONO_SEQUENCE_OUTPUT, "Mono Sequence Output");
+		outputInfos[MONO_SEQUENCE_OUTPUT]->description = "Outputs the voltage of the current step. If the Average Mode is active, this output will be the average of the current and next step voltages.";
 	}
 	
     dsp::SchmittTrigger clockTrigger;
