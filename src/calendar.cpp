@@ -3,7 +3,7 @@
 #include <chrono>
 #include <ctime>
 
-constexpr int timeUnits[] = {4, 60, 24, 7, 4, 12, 3, 12}; // Corrected divisions of each time unit
+constexpr int timeUnits[] = {4, 60, 24, 7, 4, 12, 3, 12}; // Traditional subdivisions of each time unit
 
 //Define the module
 struct Calendar : Module {
@@ -108,11 +108,12 @@ struct Calendar : Module {
 	}//end configuration
 	
 	// Time keeping
-	std::array<float, 8> lastProgress;  // Last calculated progress for each unit
+	float lastProgress[8] = {};  // Last calculated progress for each time unit
 	double lastUpdateTime = 0.0;  // Last update in real time seconds
 
-	float getTimeProgress(int timeUnitIndex, bool useUTC = false) {
+	void process(const ProcessArgs& args) override {
 		using namespace std::chrono;
+		bool useUTC = params[TOGGLE_SWITCH].getValue() > 0.5f;
 
 		// Current time in system_clock, then convert to time_t
 		auto now = system_clock::now();
@@ -122,107 +123,61 @@ struct Calendar : Module {
 		// High-resolution current time broken down into components
 		auto timeInfo = useUTC ? *gmtime(&currentTime) : *localtime(&currentTime);
 
-		float progress = 0.0f;
-		switch (timeUnitIndex) {
-			case 0: {
-				progress = (timeInfo.tm_sec % 4) + ms.count() / 1000.0f;
-				return progress / 4.0f;
-			}
-			case 1: {
-				progress = timeInfo.tm_sec + ms.count() / 1000.0f;
-				return progress / 60.0f;
-			}
-			case 2: {
-				progress = timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
-				return progress / 3600.0f;
-			}
-			case 3: {
-				progress = timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
-				return progress / 86400.0f;
-			}
-			case 4: {
-				progress = (timeInfo.tm_wday) * 86400 + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
-				return progress / (7 * 86400.0f);
-			}
-			case 5: {
-				int daysInMonth = 30;
-				switch (timeInfo.tm_mon) {
-					case 0: case 2: case 4: case 6: case 7: case 9: case 11: daysInMonth = 31; break;
-					case 1: daysInMonth = (timeInfo.tm_year % 4 == 0 && (timeInfo.tm_year % 100 != 0 || timeInfo.tm_year % 400 == 0)) ? 29 : 28; break;
-					case 3: case 5: case 8: case 10: daysInMonth = 30; break;
+		float currentProgress[8];
+		for (int i = 0; i < 8; i++) {
+			if (std::any_of(outputs.begin() + i * 5, outputs.begin() + (i * 5 + 5), [](Output& o) { return o.isConnected(); })) {
+				switch (i) {
+					case 0: {
+						currentProgress[i] = (timeInfo.tm_sec % 4 + ms.count() / 1000.0f) / 4.0f;
+					} break;
+					case 1: {
+						currentProgress[i] = (timeInfo.tm_sec + ms.count() / 1000.0f) / 60.0f;
+					} break;
+					case 2: {
+						currentProgress[i] = (timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f) / 3600.0f;
+					} break;
+					case 3: {
+						currentProgress[i] = (timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f) / 86400.0f;
+					} break;
+					case 4: {
+						currentProgress[i] = ((timeInfo.tm_wday) * 86400 + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f) / (7 * 86400.0f);
+					} break;
+					case 5: {
+						int daysInMonth = 30;
+						switch (timeInfo.tm_mon) {
+							case 0: case 2: case 4: case 6: case 7: case 9: case 11: daysInMonth = 31; break;
+							case 1: daysInMonth = (timeInfo.tm_year % 4 == 0 && (timeInfo.tm_year % 100 != 0 || timeInfo.tm_year % 400 == 0)) ? 29 : 28; break;
+							case 3: case 5: case 8: case 10: daysInMonth = 30; break;
+						}
+						currentProgress[i] = ((timeInfo.tm_mday - 1) * 86400 + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f) / (daysInMonth * 86400.0f);
+					} break;
+					case 6: {
+						int month = timeInfo.tm_mon;
+						int seasonStartMonth = (month / 3) * 3;
+						float seasonProgress = 0;
+						for (int m = seasonStartMonth; m < month; m++) {
+							seasonProgress += 30 * 86400;  // Simplified average month length
+						}
+						currentProgress[i] = (seasonProgress + (timeInfo.tm_mday - 1) * 86400 + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f) / (3 * 30 * 86400.0f);
+					} break;
+					case 7: {
+						currentProgress[i] = ((timeInfo.tm_yday * 86400) + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f) / (365 * 86400.0f);
+					} break;
 				}
-				progress = (timeInfo.tm_mday - 1) * 86400 + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
-				return progress / (daysInMonth * 86400.0f);
-			}
-			case 6: {
-				int month = timeInfo.tm_mon;
-				int seasonStartMonth = (month / 3) * 3;
-				progress = 0;
-				for (int m = seasonStartMonth; m < month; m++) {
-					progress += 30 * 86400;  // Simplified average month length
-				}
-				progress += (timeInfo.tm_mday - 1) * 86400 + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
-				return progress / (3 * 30 * 86400.0f);
-			}
-			case 7: {
-				progress = (timeInfo.tm_yday * 86400) + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
-				return progress / (365 * 86400.0f);
-			}
-			default: {
-				return 0.0f;
-			}
-		}
-	}
+				float timeStepProgress = args.sampleTime * timeUnits[i] / (timeUnits[i] == 1 ? 365 * 86400 : timeUnits[i] * (i == 5 ? 30 * 86400 : 86400));
+				currentProgress[i] = fmod(currentProgress[i] + timeStepProgress, 1.0f);
 
-	void process(const ProcessArgs& args) override {
-		bool useUTC = params[TOGGLE_SWITCH].getValue() > 0.5f;
-
-		// Check if it's time to update the main progress values
-		double currentTime = args.sampleTime * args.sampleRate * args.frame;
-		if (currentTime - lastUpdateTime >= 0.01) {  // More than 10ms has passed
-			for (int i = 0; i < 8; i++) {
-				lastProgress[i] = getTimeProgress(i, useUTC);
-			}
-			lastUpdateTime = currentTime;
-		}
-
-		for (int timeUnitIndex = 0; timeUnitIndex < 8; timeUnitIndex++) {
-			if (std::any_of(outputs.begin() + timeUnitIndex * 5, outputs.begin() + (timeUnitIndex * 5 + 5), [](Output& o) { return o.isConnected(); })) {
-				// Update the current progress based on the time elapsed since last full update
-				float currentProgress = lastProgress[timeUnitIndex] + args.sampleTime * timeUnits[timeUnitIndex] / (timeUnits[timeUnitIndex] == 1 ? 365 * 86400 : timeUnits[timeUnitIndex] * (timeUnitIndex == 5 ? 30 * 86400 : 86400));
-				currentProgress -= floor(currentProgress);  // Wrap around
-
-				// Linear Ramp output
-				if (outputs[timeUnitIndex * 5].isConnected()) {
-					float smooth = currentProgress * 10.0f;
-					outputs[timeUnitIndex * 5].setVoltage(smooth);
-				}
-
-				// Stepped Ramp output
-				if (outputs[timeUnitIndex * 5 + 1].isConnected()) {
-					float steps = timeUnits[timeUnitIndex];
-					float steppedProgress = std::floor(currentProgress * steps) / steps;
-					float stepped = steppedProgress * 10.0f;
-					outputs[timeUnitIndex * 5 + 1].setVoltage(stepped);
-				}
-
-				// Trigger output
-				if (outputs[timeUnitIndex * 5 + 2].isConnected()) {
-					float trigger = currentProgress < (1.0f / args.sampleRate) ? 10.0f : 0.0f;
-					outputs[timeUnitIndex * 5 + 2].setVoltage(trigger);
-				}
-
-				// Gate output
-				if (outputs[timeUnitIndex * 5 + 3].isConnected()) {
-					float gate = currentProgress < 0.5f ? 10.0f : 0.0f;
-					outputs[timeUnitIndex * 5 + 3].setVoltage(gate);
-				}
-
-				// Inverse Gate output
-				if (outputs[timeUnitIndex * 5 + 4].isConnected()) {
-					float inverseGate = currentProgress >= 0.5f ? 10.0f : 0.0f;
-					outputs[timeUnitIndex * 5 + 4].setVoltage(inverseGate);
-				}
+				// Update outputs
+				if (outputs[i * 5].isConnected())
+					outputs[i * 5].setVoltage(currentProgress[i] * 10.0f);
+				if (outputs[i * 5 + 1].isConnected())
+					outputs[i * 5 + 1].setVoltage(floor(currentProgress[i] * timeUnits[i]) / timeUnits[i] * 10.0f);
+				if (outputs[i * 5 + 2].isConnected())
+					outputs[i * 5 + 2].setVoltage(currentProgress[i] < (1.0f / args.sampleRate) ? 10.0f : 0.0f);
+				if (outputs[i * 5 + 3].isConnected())
+					outputs[i * 5 + 3].setVoltage(currentProgress[i] < 0.5f ? 10.0f : 0.0f);
+				if (outputs[i * 5 + 4].isConnected())
+					outputs[i * 5 + 4].setVoltage(currentProgress[i] >= 0.5f ? 10.0f : 0.0f);
 			}
 		}
 	}
