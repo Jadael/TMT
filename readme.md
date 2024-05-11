@@ -58,7 +58,7 @@ Each time unit has a row of five outputs:
 	- Month: 4 steps (i.e. weeks)
 	- Quarter: 3 steps (i.e. months)
 	- Year: 12 steps (i.e. months)
-- Trigger: This output sends a 10V trigger signal at the beginning of each time unit cycle. The trigger is activated when the progress is less than or equal to 1/10th of the reciprocal of the time unit's duration. For instance, in the case of hours, the trigger would be activated when the progress is less than or equal to 1/240 (0.1/24). This output is useful for triggering events or resets at the start of each time unit.
+- Trigger: This output sends a 10V trigger signal for 1ms at the beginning of each time unit cycle. This output is useful for triggering events or resets at the start of each time unit.
 - Gate: This output provides a 10V gate signal for the first half of the time unit cycle and 0V for the second half. The gate is active (10V) when the progress is less than 0.5 (50% of the time unit) and inactive (0V) otherwise. This output can be used to create sustained events or behaviors during the first half of each time unit cycle.
 - Inverse Gate: This output is the inverse of the gate output. It provides a 0V signal for the first half of the time unit cycle and a 10V signal for the second half. The reverse gate is active (10V) when the progress is greater than or equal to 0.5 (50% of the time unit) and inactive (0V) otherwise. This output can be used to create sustained events or behaviors during the second half of each time unit cycle.
 
@@ -281,11 +281,6 @@ Sort manipulates a polyphonic signal based on sorting criteria specified by anot
 - **Selected and Sorted Output**: First applies the selection criteria from the Select input to the Data input, then sorts the resulting channels as per the Sort input.
 - **Ascending Output**: Outputs the channels of the Data input sorted in ascending order based on their own values.
 - **Descending Output**: Outputs the channels of the Data input sorted in descending order based on their own values.
-
-## Usage
-1. Connect polyphonic cables to the Data, Sort, and Select inputs.
-2. Adjust the selection threshold using the Select input where required (e.g., set voltages above 5V to include a channel in the output).
-3. Monitor the various outputs to utilize the sorted and/or selected data in your patches.
 
 ---
 
