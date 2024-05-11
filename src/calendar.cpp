@@ -3,7 +3,7 @@
 #include <chrono>
 #include <ctime>
 
-constexpr int timeUnits[] = {4, 60, 24, 7, 4, 12, 4, 1}; // Traditional divisions of each time unit
+constexpr int timeUnits[] = {4, 60, 24, 7, 4, 12, 3, 12}; // Corrected divisions of each time unit
 
 //Define the module
 struct Calendar : Module {
@@ -107,116 +107,125 @@ struct Calendar : Module {
 		configOutput(YEAR_IGATE_OUTPUT, "1 year inverted gate (high during second half)");
 	}//end configuration
 	
+	// Time keeping
+	std::array<float, 8> lastProgress;  // Last calculated progress for each unit
+	double lastUpdateTime = 0.0;  // Last update in real time seconds
+
 	float getTimeProgress(int timeUnitIndex, bool useUTC = false) {
-		/**
-		 * @brief Calculate the progress of the given time unit as a float from 0.0 to 1.0.
-		 * 
-		 * This function calculates the progress of the specified time unit by taking into account
-		 * the current system time and milliseconds, providing a smooth linear increase.
-		 * 
-		 * @param timeUnitIndex An integer representing the time unit, where:
-		 *                      0 - second
-		 *                      1 - minute
-		 *                      2 - hour
-		 *                      3 - day
-		 *                      4 - week
-		 *                      5 - month
-		 *                      6 - quarter
-		 *                      7 - year
-		 * @param useUTC Optional flag to use UTC time instead of local time (default is false).
-		 * @return A float value representing the progress of the specified time unit, from 0.0 to 1.0.
-		 *         If an invalid timeUnitIndex is provided, the function will return 0.0f.
-		 * 
-		 * Special concerns or shortcomings:
-		 * - Assumes an average month duration of 30 days and an average year duration of 365 days.
-		 * - The function may be affected by leap years and daylight saving time changes.
-		 * - This function uses the C++11 standard library and the <chrono> library for time handling.
-		 * - The function has been tested with g++ and the -std=c++11 flag.
-		 */
+		using namespace std::chrono;
 
-		auto now = std::chrono::system_clock::now();
-		std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
-		std::tm timeInfo = useUTC ? *std::gmtime(&currentTime) : *std::localtime(&currentTime);
-		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+		// Current time in system_clock, then convert to time_t
+		auto now = system_clock::now();
+		time_t currentTime = system_clock::to_time_t(now);
+		auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+		
+		// High-resolution current time broken down into components
+		auto timeInfo = useUTC ? *gmtime(&currentTime) : *localtime(&currentTime);
 
-		float currentValue, maxValue;
-		float currentMillisecond = static_cast<float>(ms.count())/1000;
-		float currentSecond = static_cast<float>(timeInfo.tm_sec);
-		float currentMinute = static_cast<float>(timeInfo.tm_min);
-		float currentHour = static_cast<float>(timeInfo.tm_hour);
-		float currentWeekday = static_cast<float>(timeInfo.tm_wday);
-		float currentMonthday = static_cast<float>(timeInfo.tm_mday);
-		float currentQuartermonth = static_cast<float>(timeInfo.tm_mon % 3);
-		float currentYearday = static_cast<float>(timeInfo.tm_yday);
-		if (timeUnitIndex == 0) { // second
-			currentValue = currentMillisecond;
-			maxValue = 1.0f; // 1 decimal second
-		} else if (timeUnitIndex == 1) { // minute
-			currentValue = currentSecond + currentMillisecond;
-			maxValue = 60.0f; // 60 decimal seconds
-		} else if (timeUnitIndex == 2) { // hour
-			currentValue = currentMinute * 60 + currentSecond + currentMillisecond;
-			maxValue = 60.0f * 60; // sixty minutes per hour, converted to seconds, converted to ms
-		} else if (timeUnitIndex == 3) { // day
-			currentValue = currentHour * 60 * 60 + currentMinute * 60 + currentSecond + currentMillisecond;
-			maxValue = 24.0f * 60 * 60;
-		} else if (timeUnitIndex == 4) { // week
-			currentValue = currentWeekday * 24 * 60 * 60  + currentHour * 60 * 60 + currentMinute * 60 + currentSecond + currentMillisecond;
-			maxValue = 7.0f * 24 * 60 * 60;
-		} else if (timeUnitIndex == 5) { // month
-			currentValue = currentMonthday * 24 * 60 * 60 + currentHour * 60 * 60 + currentMinute * 6 + currentSecond + currentMillisecond;
-			maxValue = 30.0f * 24 * 60 * 60;
-		} else if (timeUnitIndex == 6) { // quarter
-			currentValue = currentQuartermonth * 30 * 24 * 60 * 60  + currentMonthday * 24 * 60 * 60 + currentHour * 60 * 60 + currentMinute * 60 + currentSecond + currentMillisecond;
-			maxValue = 3.0f * 30 * 24 * 60 * 60;
-		} else if (timeUnitIndex == 7) { // year
-			currentValue = currentYearday * 24 * 60 * 60 + currentHour * 60 * 60 + currentMinute * 60 + currentSecond + currentMillisecond;
-			maxValue = 365.0f * 24 * 60 * 60;
-		} else { // invalid index
-			return 0.0f;
+		float progress = 0.0f;
+		switch (timeUnitIndex) {
+			case 0: {
+				progress = (timeInfo.tm_sec % 4) + ms.count() / 1000.0f;
+				return progress / 4.0f;
+			}
+			case 1: {
+				progress = timeInfo.tm_sec + ms.count() / 1000.0f;
+				return progress / 60.0f;
+			}
+			case 2: {
+				progress = timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
+				return progress / 3600.0f;
+			}
+			case 3: {
+				progress = timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
+				return progress / 86400.0f;
+			}
+			case 4: {
+				progress = (timeInfo.tm_wday) * 86400 + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
+				return progress / (7 * 86400.0f);
+			}
+			case 5: {
+				int daysInMonth = 30;
+				switch (timeInfo.tm_mon) {
+					case 0: case 2: case 4: case 6: case 7: case 9: case 11: daysInMonth = 31; break;
+					case 1: daysInMonth = (timeInfo.tm_year % 4 == 0 && (timeInfo.tm_year % 100 != 0 || timeInfo.tm_year % 400 == 0)) ? 29 : 28; break;
+					case 3: case 5: case 8: case 10: daysInMonth = 30; break;
+				}
+				progress = (timeInfo.tm_mday - 1) * 86400 + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
+				return progress / (daysInMonth * 86400.0f);
+			}
+			case 6: {
+				int month = timeInfo.tm_mon;
+				int seasonStartMonth = (month / 3) * 3;
+				progress = 0;
+				for (int m = seasonStartMonth; m < month; m++) {
+					progress += 30 * 86400;  // Simplified average month length
+				}
+				progress += (timeInfo.tm_mday - 1) * 86400 + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
+				return progress / (3 * 30 * 86400.0f);
+			}
+			case 7: {
+				progress = (timeInfo.tm_yday * 86400) + timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + ms.count() / 1000.0f;
+				return progress / (365 * 86400.0f);
+			}
+			default: {
+				return 0.0f;
+			}
+		}
+	}
+
+	void process(const ProcessArgs& args) override {
+		bool useUTC = params[TOGGLE_SWITCH].getValue() > 0.5f;
+
+		// Check if it's time to update the main progress values
+		double currentTime = args.sampleTime * args.sampleRate * args.frame;
+		if (currentTime - lastUpdateTime >= 0.01) {  // More than 10ms has passed
+			for (int i = 0; i < 8; i++) {
+				lastProgress[i] = getTimeProgress(i, useUTC);
+			}
+			lastUpdateTime = currentTime;
 		}
 
-		return currentValue / maxValue;
-	}
-	//Main loop
-	void process(const ProcessArgs& args) override {
-		//Limit to updating once per millisecond
-		static auto lastUpdateTime = std::chrono::steady_clock::now();
-		auto currentTime = std::chrono::steady_clock::now();
-		if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastUpdateTime).count() < 5) return;
-		lastUpdateTime = currentTime;
-		bool useUTC = params[TOGGLE_SWITCH].getValue() > 0.5f;
-		
-		// Update outputs
 		for (int timeUnitIndex = 0; timeUnitIndex < 8; timeUnitIndex++) {
-			float progress = getTimeProgress(timeUnitIndex, useUTC);
-			float smooth = progress * 10.0f;
-			float stepped = (std::floor(progress * timeUnits[timeUnitIndex]) / timeUnits[timeUnitIndex]) * 10.0f;
-			float trigger = progress <= 0.1f / timeUnits[timeUnitIndex] ? 10.0f : 0.0f;
-			float gate = progress < 0.5f ? 10.0f : 0.0f;
-			float reverseGate = progress >= 0.5f ? 10.0f : 0.0f;
-				for (int i = 0; i < 5; i++) {
-				OutputId outId = static_cast<OutputId>(timeUnitIndex * 5 + i);
-				switch (i) {
-					case 0:
-						outputs[outId].setVoltage(smooth);
-						break;
-					case 1:
-						outputs[outId].setVoltage(stepped);
-						break;
-					case 2:
-						outputs[outId].setVoltage(trigger);
-						break;
-					case 3:
-						outputs[outId].setVoltage(gate);
-						break;
-					case 4:
-						outputs[outId].setVoltage(reverseGate);
-						break;
+			if (std::any_of(outputs.begin() + timeUnitIndex * 5, outputs.begin() + (timeUnitIndex * 5 + 5), [](Output& o) { return o.isConnected(); })) {
+				// Update the current progress based on the time elapsed since last full update
+				float currentProgress = lastProgress[timeUnitIndex] + args.sampleTime * timeUnits[timeUnitIndex] / (timeUnits[timeUnitIndex] == 1 ? 365 * 86400 : timeUnits[timeUnitIndex] * (timeUnitIndex == 5 ? 30 * 86400 : 86400));
+				currentProgress -= floor(currentProgress);  // Wrap around
+
+				// Linear Ramp output
+				if (outputs[timeUnitIndex * 5].isConnected()) {
+					float smooth = currentProgress * 10.0f;
+					outputs[timeUnitIndex * 5].setVoltage(smooth);
+				}
+
+				// Stepped Ramp output
+				if (outputs[timeUnitIndex * 5 + 1].isConnected()) {
+					float steps = timeUnits[timeUnitIndex];
+					float steppedProgress = std::floor(currentProgress * steps) / steps;
+					float stepped = steppedProgress * 10.0f;
+					outputs[timeUnitIndex * 5 + 1].setVoltage(stepped);
+				}
+
+				// Trigger output
+				if (outputs[timeUnitIndex * 5 + 2].isConnected()) {
+					float trigger = currentProgress < (1.0f / args.sampleRate) ? 10.0f : 0.0f;
+					outputs[timeUnitIndex * 5 + 2].setVoltage(trigger);
+				}
+
+				// Gate output
+				if (outputs[timeUnitIndex * 5 + 3].isConnected()) {
+					float gate = currentProgress < 0.5f ? 10.0f : 0.0f;
+					outputs[timeUnitIndex * 5 + 3].setVoltage(gate);
+				}
+
+				// Inverse Gate output
+				if (outputs[timeUnitIndex * 5 + 4].isConnected()) {
+					float inverseGate = currentProgress >= 0.5f ? 10.0f : 0.0f;
+					outputs[timeUnitIndex * 5 + 4].setVoltage(inverseGate);
 				}
 			}
 		}
-	}//end main loop
+	}
 };//end Calendar : Module
 
 //Define the "panel" (e.g. the widget and visuals of the module)
