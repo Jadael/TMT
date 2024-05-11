@@ -59,39 +59,39 @@ struct Stats : Module {
 	Stats() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		// Configure the toggle switch parameter with a label and a tooltip for additional detail
-		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode");
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode: Process at audio rate (CPU heavy)");
 
 		// Configure the main polyphonic input
 		configInput(POLY_INPUT, "Polyphonic Input");
-		inputInfos[POLY_INPUT]->description = "The main input for the module. Connect a polyphonic signal here to compute various statistics based on the voltages of each channel.";
+		inputInfos[POLY_INPUT]->description = "- The main input for the module. Connect a polyphonic signal here to compute various statistics based on the voltages of each channel.";
 
 		// Configure the outputs and their detailed descriptions
 		configOutput(MEAN_OUTPUT, "Mean");
-		outputInfos[MEAN_OUTPUT]->description = "Outputs the arithmetic mean (average) of the voltages connected to the 'Polyphonic Input'.\nThe mean is the sum of all input voltages divided by the number of channels.";
+		outputInfos[MEAN_OUTPUT]->description = "- Outputs the arithmetic mean (average) of the voltages connected to the 'Polyphonic Input'.\n- The mean is the sum of all input voltages divided by the number of channels.";
 
 		configOutput(MEDIAN_OUTPUT, "Median");
-		outputInfos[MEDIAN_OUTPUT]->description = "Outputs the median of the voltages connected to the 'Polyphonic Input'.\nThe median is the middle value that separates the higher half from the lower half of the data set.";
+		outputInfos[MEDIAN_OUTPUT]->description = "- Outputs the median of the voltages connected to the 'Polyphonic Input'.\n- The median is the middle value that separates the higher half from the lower half of the data set.";
 
 		configOutput(MODE_OUTPUT, "Mode(s)");
-		outputInfos[MODE_OUTPUT]->description = "Outputs the mode(s) of the voltages connected to the 'Polyphonic Input'.\nThe mode is the value that appears most frequently in the data set.\nIf multiple values are equally frequent, all are considered modes and result will be polyphonic.";
+		outputInfos[MODE_OUTPUT]->description = "- Outputs the mode(s) of the voltages connected to the 'Polyphonic Input'.\n- The mode is the value that appears most frequently in the data set.\n- If multiple values are equally frequent, all are considered modes and result will be polyphonic.";
 
 		configOutput(GEOMETRIC_MEAN_OUTPUT, "Geometric Mean");
-		outputInfos[GEOMETRIC_MEAN_OUTPUT]->description = "Outputs the geometric mean of the voltages connected to the 'Polyphonic Input'.\nThe geometric mean is the nth root of the product of all the input voltages, where n is the number of channels.\nNote, because this involves multiplication, if ANY input channel is 0, result will be zero.";
+		outputInfos[GEOMETRIC_MEAN_OUTPUT]->description = "- Outputs the geometric mean of the voltages connected to the 'Polyphonic Input'.\n- The geometric mean is the nth root of the product of all the input voltages, where n is the number of channels.\n- Note, because this involves multiplication, if ANY input channel is 0, result will be zero.";
 
 		configOutput(PRODUCT_OUTPUT, "Product");
-		outputInfos[PRODUCT_OUTPUT]->description = "Outputs the product of the voltages connected to the 'Polyphonic Input'.\nThis is the result of multiplying all the input voltages together.\nNote, because this involves multiplication, if ANY input channel is 0, result will be zero.\n!!! WARNING: THIS CAN OUTPUT EXTREMELY LARGE VOLTAGES !!!";
+		outputInfos[PRODUCT_OUTPUT]->description = "- Outputs the product of the voltages connected to the 'Polyphonic Input'.\n- This is the result of multiplying all the input voltages together.\n- Note, because this involves multiplication, if ANY input channel is 0, result will be zero.\n- !!! WARNING: THIS CAN OUTPUT EXTREMELY LARGE VOLTAGES !!!";
 
 		configOutput(COUNT_OUTPUT, "Count");
-		outputInfos[COUNT_OUTPUT]->description = "Outputs the number of active channels in the 'Polyphonic Input'.\nThis is the count of how many input channels are currently providing a signal, where 1 channel is 1.0v, 16 channels is 16.0v.\n!!! WARNING: THIS CAN OUTPUT >10v !!!";
+		outputInfos[COUNT_OUTPUT]->description = "- Outputs the number of active channels in the 'Polyphonic Input'.\n- This is the count of how many input channels are currently providing a signal, where 1 channel is 1.0v, 16 channels is 16.0v.\n- !!! WARNING: THIS CAN OUTPUT >10v !!!";
 
 		configOutput(SUM_OUTPUT, "Sum");
-		outputInfos[SUM_OUTPUT]->description = "Outputs the sum of all the voltages connected to the 'Polyphonic Input'.\nThis is the total of all input voltages added together.\n!!! WARNING: THIS CAN OUTPUT LARGE VOLTAGES !!!";
+		outputInfos[SUM_OUTPUT]->description = "- Outputs the sum of all the voltages connected to the 'Polyphonic Input'.\n- This is the total of all input voltages added together.\n- !!! WARNING: THIS CAN OUTPUT LARGE VOLTAGES !!!";
 
 		configOutput(ASCENDING_OUTPUT, "Ascending");
-		outputInfos[ASCENDING_OUTPUT]->description = "Outputs the voltages from the 'Polyphonic Input' sorted in ascending order.\nEach channel corresponds to one of the input voltages, sorted from smallest to largest.";
+		outputInfos[ASCENDING_OUTPUT]->description = "- Outputs the voltages from the 'Polyphonic Input' sorted in ascending order.\n- Each channel corresponds to one of the input voltages, sorted from smallest to largest.";
 
 		configOutput(DISTINCT_OUTPUT, "Distinct");
-		outputInfos[DISTINCT_OUTPUT]->description = "Outputs the distinct voltages from the 'Polyphonic Input', removing any duplicates.\nVoltages are considered duplicates if they are within 0.001 volts.";
+		outputInfos[DISTINCT_OUTPUT]->description = "- Outputs the distinct voltages from the 'Polyphonic Input', removing any duplicates.\n- Voltages are considered duplicates if they are within 0.001 volts.";
 
 		// Reset the timer for the initial state
 		timeSinceUpdate.reset();

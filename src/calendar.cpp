@@ -64,7 +64,7 @@ struct Calendar : Module {
 	//Configure module
 	Calendar() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Use UTC time instead of Local");
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode: Use UTC time instead of Local");
 		configOutput(SECOND_SMOOTH_OUTPUT, "1 second linear ramp");
 		configOutput(SECOND_STEPPED_OUTPUT, "1 second stepped ramp, 4 steps");
 		configOutput(SECOND_TRIGGER_OUTPUT, "1 second trigger");
