@@ -115,7 +115,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
         configInput(RESET_INPUT, "Reset");
 		configInput(INDEX_INPUT, "Index");
         configOutput(POLY_OUTPUT, "Polyphonic voltages from columns");
-		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Toggle relative / absolute indexing");
+		configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Toggle Relative or Absolute indexing");
 		configOutput(RELATIVE_OUTPUT, "Relative Index");
 		configOutput(ABSOLUTE_OUTPUT, "Absolute Index");
 
@@ -426,7 +426,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		}
 
 		if (steps.empty()) {
-			steps.push_back(std::vector<StepData>(16, StepData{0.0f, 'E'}));
+			steps.push_back(std::vector<StepData>(16, StepData{0.0f, 'U'}));
 		}
 
 		currentStep = currentStep % steps.size();
@@ -534,6 +534,9 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 					} else {
 						outputValue = 10.0f;
 					}
+					break;
+				case 'G':  // Full-width gate
+          outputValue = 10.0f;
 					break;
 				case 'N':  // Normal pitch or CV
 					outputValue = step.voltage;
@@ -1277,7 +1280,7 @@ struct SpellbookResizeHandle : OpaqueWidget {
 			// Make resizing an undo/redo action. If I don't do this, undoing a
 			// different module's move will cause them to overlap (aka, a
 			// transporter malfunction).
-			APP->history->push(new SpellbookUndoRedoAction(module->id, original_width, module->width));
+			//APP->history->push(new SpellbookUndoRedoAction(module->id, original_width, module->width));
 		}
 	}
 };
