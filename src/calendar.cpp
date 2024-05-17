@@ -2,6 +2,7 @@
 #include "ports.hpp"
 #include <chrono>
 #include <ctime>
+#include <time.h> // Include this for gmtime_r
 
 constexpr int timeUnits[] = {4, 60, 24, 7, 4, 12, 3, 12}; // Traditional subdivisions of each time unit
 
@@ -121,7 +122,20 @@ struct Calendar : Module {
 		auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
 		
 		// High-resolution current time broken down into components
-		auto timeInfo = useUTC ? *gmtime(&currentTime) : *localtime(&currentTime);
+		struct tm timeInfo;
+		if (useUTC) {
+	#ifdef _POSIX_VERSION
+			gmtime_r(&currentTime, &timeInfo); // Use thread-safe version if available
+	#else
+			timeInfo = *gmtime(&currentTime);  // Fallback to standard gmtime
+	#endif
+		} else {
+	#ifdef _POSIX_VERSION
+			localtime_r(&currentTime, &timeInfo); // Use thread-safe version if available
+	#else
+			timeInfo = *localtime(&currentTime);  // Fallback to standard localtime
+	#endif
+		}
 
 		float currentProgress[8];
 		for (int i = 0; i < 8; i++) {
