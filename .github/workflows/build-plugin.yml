@@ -121,25 +121,33 @@ jobs:
           tag: ${{ github.ref }}
           file_glob: true
 
-  publish-nightly:
-    name: Publish nightly
+  publish-preview:
+    name: Publish preview build
     runs-on: ubuntu-latest
     needs: [build, build-mac]
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
       - uses: actions/download-artifact@v4
         with:
           path: _artifacts
-      - name: Delete old release assets
-        uses: mknejp/delete-release-assets@v1
+      - name: Delete old preview release
+        run: |
+          gh release delete Preview --repo ${{ github.repository }} --yes || true
+      - name: Create new preview release
+        uses: softprops/action-gh-release@v1
         with:
-          token: ${{ github.token }}
-          tag: Nightly # This may also be of the form 'refs/tags/staging'
-          fail-if-no-assets: false
-          assets: '*'
+          tag_name: Preview
+          name: Preview
+          body: |
+            ⚠ Could be crash bugs in this one, this rebuilds for every commit. I especially recommend avoiding this if it's less than a day old. ⚠
+          draft: false
+          prerelease: true
       - name: Upload release assets
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: _artifacts/**/*.vcvplugin
-          tag: Nightly
+          tag: Preview
           file_glob: true

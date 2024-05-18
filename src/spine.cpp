@@ -57,7 +57,7 @@ struct Spine : Module {
     Spine() {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
         // Configure the toggle switch parameter with a label and a tooltip for additional detail
-        configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode: Process at audio rate (CPU heavy)");
+        configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Alt Mode: Process at audio rate instead of 10ms");
 
         // Configure the main polyphonic input
         configInput(X_INPUT, "x");
