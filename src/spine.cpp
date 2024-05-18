@@ -37,6 +37,7 @@ struct Spine : Module {
         INPUTS_LEN
     };
     enum OutputId {
+        ZERO_OUTPUT,
         ADD_1V_OUTPUT,
         SUB_1V_OUTPUT,
         ADD_5V_OUTPUT,
@@ -62,6 +63,7 @@ struct Spine : Module {
         configInput(X_INPUT, "x");
 
         // Configure the outputs and their detailed descriptions
+        configOutput(ZERO_OUTPUT, "x + 0v");
         configOutput(ADD_1V_OUTPUT, "x + 1v");
         configOutput(SUB_1V_OUTPUT, "x - 1v");
         configOutput(ADD_5V_OUTPUT, "x + 5v");
@@ -99,6 +101,8 @@ struct Spine : Module {
           if (inputs[X_INPUT].isConnected()) {
             x = inputs[X_INPUT].getVoltage(c);
           }
+          // ZERO_OUTPUT: x + 0v
+          outputs[ZERO_OUTPUT].setVoltage(x + 0.0f, c);
           // ADD_1V_OUTPUT: x + 1v
           outputs[ADD_1V_OUTPUT].setVoltage(x + 1.0f, c);
           // SUB_1V_OUTPUT: x - 1v
@@ -128,6 +132,7 @@ struct SpineWidget : ModuleWidget {
 
         addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP * 1, GRID_SNAP * 1.5)), module, Spine::X_INPUT));
 
+        addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 1, GRID_SNAP * 3)), module, Spine::ZERO_OUTPUT));
         addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 1, GRID_SNAP * 4)), module, Spine::ADD_1V_OUTPUT));
         addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 1, GRID_SNAP * 5)), module, Spine::SUB_1V_OUTPUT));
         addOutput(createOutputCentered<BrassPortOut>(mm2px(Vec(GRID_SNAP * 1, GRID_SNAP * 6)), module, Spine::ADD_5V_OUTPUT));
