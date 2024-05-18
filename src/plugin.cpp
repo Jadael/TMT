@@ -16,6 +16,7 @@ void init(Plugin* p) {
 	p->addModel(modelStats);
 	p->addModel(modelBlankt);
 	p->addModel(modelSort);
+	p->addModel(modelSpine);
 	// Any other plugin initialization may go here.
 	// As an alternative, consider lazy-loading assets and lookup tables when your module is created to reduce startup times of Rack.
 }

@@ -96,6 +96,12 @@
       "name": "Sort",
       "description": "A tool to arbitrarily sort and select channels from a polyphonic cable using polyphonic CVs.",
       "tags": []
+    },
+	{
+      "slug": "Spine",
+      "name": "Spine",
+      "description": "A few constant CV offsets I use all the time.",
+      "tags": ["Polyphonic","Utility"]
     }
   ]
 }

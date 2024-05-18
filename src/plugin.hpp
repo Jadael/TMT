@@ -17,3 +17,4 @@ extern Model* modelSpellbook;
 extern Model* modelStats;
 extern Model* modelBlankt;
 extern Model* modelSort;
+extern Model* modelSpine;
