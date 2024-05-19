@@ -85,7 +85,7 @@ struct Calendar : Module {
 
     float getCurrentProgress(int unitIndex, float timeFraction) {
         switch (unitIndex) {
-            case 0: return (timeInfo.tm_sec % 4 + timeFraction) / 4.0f;
+            case 0: return (timeInfo.tm_sec % 1 + timeFraction) / 1.0f;
             case 1: return (timeInfo.tm_sec + timeFraction) / 60.0f;
             case 2: return (timeInfo.tm_min * 60 + timeInfo.tm_sec + timeFraction) / 3600.0f;
             case 3: return (timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec + timeFraction) / 86400.0f;
