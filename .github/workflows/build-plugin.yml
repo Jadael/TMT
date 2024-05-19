@@ -132,9 +132,20 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: _artifacts
-      - name: Delete old preview release
+      - name: Check if preview release exists
+        id: check-preview
         run: |
-          gh release delete Preview --repo ${{ github.repository }} --yes || true
+          if gh release view Preview --repo ${{ github.repository }}; then
+            echo "Preview release exists"
+            echo "exists=true" >> $GITHUB_ENV
+          else
+            echo "Preview release does not exist"
+            echo "exists=false" >> $GITHUB_ENV
+          fi
+      - name: Delete old preview release
+        if: env.exists == 'true'
+        run: |
+          gh release delete Preview --repo ${{ github.repository }} --yes
       - name: Create new preview release
         uses: softprops/action-gh-release@v1
         with:
