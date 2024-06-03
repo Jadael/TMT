@@ -445,7 +445,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		}
 		
 		bool resetHigh = inputs[RESET_INPUT].getVoltage() >= 5.0f;
-		bool ignoreClock = !resetIgnoreTimer.check(0.01f);
+		bool ignoreClock = !resetIgnoreTimer.check(0.005f);
 
 		if (dirty) {
 			parseText();  // Reparse the text into steps
@@ -457,7 +457,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 		int stepCount = steps.size();
 		int lastStep = currentStep;
 		
-		if (!inputs[INDEX_INPUT].isConnected() && !resetHigh && !ignoreClock && !steps.empty()) {
+		if (!inputs[INDEX_INPUT].isConnected() && !ignoreClock && !steps.empty()) {
 			// Forward step
 			if (stepForwardTrigger.process(inputs[STEPFWD_INPUT].getVoltage())) {
 				currentStep = (currentStep + 1) % stepCount;

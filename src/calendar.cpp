@@ -113,7 +113,7 @@ struct Calendar : Module {
         if (outputs[unitIndex * 5 + 1].isConnected())
             outputs[unitIndex * 5 + 1].setVoltage(std::floor(currentProgress * timeUnits[unitIndex]) / timeUnits[unitIndex] * 10.0f);
         if (outputs[unitIndex * 5 + 2].isConnected())
-            outputs[unitIndex * 5 + 2].setVoltage(currentProgress < (1.0f / args.sampleRate) ? 10.0f : 0.0f);
+            outputs[unitIndex * 5 + 2].setVoltage(currentProgress < (0.01f) ? 10.0f : 0.0f);
         if (outputs[unitIndex * 5 + 3].isConnected())
             outputs[unitIndex * 5 + 3].setVoltage(currentProgress < 0.5f ? 10.0f : 0.0f);
         if (outputs[unitIndex * 5 + 4].isConnected())
