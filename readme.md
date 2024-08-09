@@ -1,19 +1,23 @@
 # T's Musical Tools
-A collection of esoteric modules mostly focused around manipulating RNG and polyphonic signals in useful ways.
+A collection of esoteric modules. Many are focused around deterministic RNG, and manipulating polyphonic signals in useful ways such as shuffling, sorting, joining, or selecting subsets of them. Spellbook offers a plain text, "CSV like" noitation for sequencing pitches and CVs.
 
-- Download from the [VCV Rack Library plugin page](https://library.vcvrack.com/TMT)
-- Check [Releases](https://github.com/Jadael/TMT/releases) to [install the latest preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins)
+# Get It:
+
+- Download from the [VCV Rack Library plugin page](https://library.vcvrack.com/TMT) (*recommended*)
+- *Or,* check [Releases](https://github.com/Jadael/TMT/releases) to [install the latest preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins)
 
 ## Table of Contents
-- [Shuffle](#shuffle) - Reorder the channels of a polyphonic signal.
-- [Calendar](#calendar) - Output LFO-like signals based on local time and day.
-- [Seed](#seed) - 16 seedable random numbers.
-- [Ouroboros](#ouroboros) - Step through the channels of a polyphonic signal like a sequence.
-- [Append](#append) - Combine the channels of up to 16 mono or polyphonic cables (up to an internal buffer of 128 channels), and output up to a 16 channel slice of them.
-- [Sight](#sight) - A screen-rate scope where time slows down over the width of the scope.
-- [Spellbook](#spellbook) - Plain text sequencing.
-- [Stats](#stats) - Get statistical measures like mean, median, mode, etc. of a polyphonic signal.
-- [Sort](#sort) - Sort and select channels from a polyphonic input using other CV inputs.
+- [Calendar](#calendar) - Output LFO-like signals based on local time and day, creating rising sawtooths synced with seconds/minutes/hours/days/weeks/months/seasons/years. Loosely inspired by Aria Salvatrice's "Arcane" module (try sampling Calendar as your RNG seed source!)
+- [Seed](#seed) - Get 16 random numbers, with an option to provide an RNG seed.
+- [Shuffle](#shuffle) - Randomly re-order the channels of a polyphonic signal, with an option to provide an RNG seed.
+- [Ouroboros](#ouroboros) - Step through the channels of a polyphonic signal as a sequence. Try using Seed as your sequence source! Maybe Shuffle it every two bars?
+- [Append](#append) - Combine the channels of up to 16 mono or polyphonic cables (i.e. append the multiple lists together into one big list; up to a total internal buffer of 128 channels), then output a 1 to 16 channel subset of them, with CV controls for width and starting point.
+- [Stats](#stats) - Get statistical measures like mean, median, mode, product, etc. of the channels of a polyphonic signal.
+- [Sort](#sort) - Sort and select channels from a polyphonic input using other CV inputs, similar to Excel functions like RANK(), FILTER(), UNIQUE(), and more.
+- [Spellbook](#spellbook) - Plain text "CSV like" sequencing of CVs/pitches with a broad variety of accepted formats; such as pitch names, MIDI note numbers, semitones, Hertz, etc. Write sequences in rows and columns like a spreadsheet!
+- [Sight](#sight) - A scope where time slows down over the width of the scope, letting you see a signal over different timescales simultaneously.
+
+---
 
 # Shuffle
 ![Shuffle](screenshots/shuffle.png)
