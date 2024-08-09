@@ -183,7 +183,7 @@ D5        , X       , 60%
 B4        , X       , 50%
 ```
 
-In this example, each step sets a pitch in column one, uses column two for gating, and controls a velocity CV in column three. The sequence plays a C major arpeggio, gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored by the parser because they are comments starting with `?`.
+In this example, each step sets a pitch in column one, uses column two for gating, and controls a velocity CV in column three. The sequence plays a C major arpeggio, gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored by the parser because they are comments starting with `?`. NOTE: There is NO "header row"! Comments can be in any cell of any row. By convention, comments in row 1 are the "column labels".
 
 Here's the same arpeggio, but with a little more rhythmic variation:
 
