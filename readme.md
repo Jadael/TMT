@@ -198,18 +198,17 @@ B4        , X       , 50%
           ,         , 
 ```
 
-This pattern holds the first note over three steps by using consecutive `|` gates, using `X` Retriggers to ensure a new rising edge when notes begin (even after a full width gate).
+This pattern seamlessly holds the first note over three steps by using consecutive `|` "full-width gates", using `X` Retriggers to ensure a new rising edge when notes begin (i.e even directly after a full width gate).
 
 
 ### Syncing Multiple Spellbooks
 The second pattern above is twice as many steps as before, so to play both sequences over the same duration, there are three basic approaches:
 
-- "Clock" them differently: step the longer one forward at twice the speed, because it is twice the length.
-- Use the Index input, in Relative mode, to sync them to the same LFO/Phasor.
+- "Clock" them differently: step the longer one forward at twice the speed, because it is twice the length, and Reset them to sync them up.
+- Use the Index input, in Relative mode, to sync them to the same external LFO/Phasor. This approach lets the two sequences by any length you want, and still play over the exact same duration; useful for polyrhythms and polymeters, for example.
 - Index one of the them to the Relative Index Output of the other. Note that the Relative Index Output is stochastic, 
-not smooth, so it doesn't work quite the same as an LFO/Phasor.
-	- If you sync the longer one to the short one, it will get four index voltages from the short one (one 
-for each step), which would mean it steps to *every other step* in its sequence.
+not a smooth sawtooth/phasor, so you'll get exactly one step from the "following" Spellbook for each step of the "driving" Spellbook.
+	- For example, if you sync a Spellbook containing the longer sequence above to another Spellbook containing the short one, it will get four index voltages from the short one (one for each step), resulting in it skipping to *every other step* in its own sequence.
 
 Watch a brief demonstration here:
 
