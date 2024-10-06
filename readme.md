@@ -158,8 +158,8 @@ Seed is a static random voltage generator with 16 individual outputs and a polyp
 ## Usage Guide
 Seed is designed for creating reproducible randomness in your patches:
 
-1. **Basic Usage**: Leave the Seed input unconnected for continuously changing random voltages.
-2. **Controlled Randomness**: Connect a stable voltage to the Seed input to get a consistent set of random voltages. Changing this voltage will produce a new set of random values.
+1. **Basic Usage**: Leave the Seed input unconnected, and it boots up with a randomly generated seed, giving you 16 static random voltages, each between 0 to 10.
+2. **Controlled Randomness**: Connect a stable voltage to the Seed input to get a consistent set of random voltages. Connecting or changing this voltage will produce a new set of random values. Going back to the same voltage, generates the same values.
 3. **Evolving Patterns**: Use an LFO or sequencer to modulate the Seed input for evolving random patterns.
 4. **Gate Generation**: Enable Alt Mode to turn Seed into a random gate generator, outputting only 0v or 10v.
 5. **Sequence the Seed**: If you send a sequence of seed values, you'll get a series of "random patterns" that loops back around and does the same random patterns again, making it a breeze to incorporate random but intentional-feeling modulations to your patches.
