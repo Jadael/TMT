@@ -7,3 +7,5 @@
 .DS_Store
 helper.py
 makefile
+*.wav
+misc/Notepad++ Session
