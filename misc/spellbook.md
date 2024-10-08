@@ -1,9 +1,11 @@
 # Spellbook
+
 ![Spellbook](screenshots/spellbook.png)
 
 Spellbook is a module for VCV Rack to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs, each of which outputs a voltage controlled by the corresponding column in RhythML-formatted text input.
 
 ## Inputs & Outputs
+
 - **Step Forward**: Advances to the next step in the sequence on the rising edge of a trigger.
 - **Step Backward**: Advances to the prior step in the sequence on the rising edge of a trigger.
 - **Reset Input**: Resets the sequence to the first step on the rising edge of the input signal.
@@ -24,7 +26,7 @@ If plaintext and spreadsheets make sense to you, you might like Spellbook. Very 
 
 If other sequencers don't jive with you, give Spellbook a try, but be warned: it is weird.
 
-Spellbook sequences are programmed using the RhythML format, a syntax to define pitch and CV patterns in plain text. Sort of a "tablature" or "markup" vibe, rather than "scripting" or "coding" (there are no conditional branching, or calculations, or loops, or anything like that). Each row in the sequence represents one step, typically triggered sequentially by the "Step Forward" input. Text written in each "column" (defined by the commas) is parsed to determine what voltage to send to the corresponding output jack (one per column) for the current step.
+Spellbook sequences are described in plain text using the RhythML format, a syntax to define pitch and CV patterns in plain text. Sort of a "tablature" or "markup" vibe, rather than "scripting" or "coding" (there is no conditional branching, or calculations, or loops, or anything like that). Each row in the sequence represents one step, typically triggered sequentially by the "Step Forward" input. Text written in each "column" (defined by the commas) is parsed to determine what voltage to send to the corresponding output jack (one per column) for the current step.
 
 ### RhythML Syntax Quick Start
 
@@ -46,8 +48,8 @@ These formats are all parsed and translated into the equivalent 1v/octave contro
   - Microtonal accidentals are also available: `$` for half-sharp, and `d` for half-flat (e.g. `C$4` for "C half-sharp 4")
 - **MIDI numbers**: Numbers prefixed with `m` (e.g. `m60`) are parsed as MIDI note numbers. `m60` = 0v.
   - Decimals are allowed, but most MIDI devices will round it back to the nearest MIDI number anyway, so for microtonal MIDI you could send a pitch bend from a second column to get those microtones, and make sure your MIDI instrument handles pitch bending.
-- **Semitones**: Numbers prefixed with `s` (e.g. `s7`) are parsed as semitones relative to C4. `s0` = 0v, `s12` = 1v.
-- **Cents**: Numbers ending with `ct` are parsed as cents relative to C4. `0ct` = 0v, `100ct` = 1v.
+- **Semitones**: Numbers prefixed with `s` (e.g. `s7`) are parsed as semitones relative to C4. `s0` = 0v.
+- **Cents**: Numbers ending with `ct` are parsed as cents relative to C4. `0ct` = 0v.
 - **Hertz**: Numbers ending with `Hz` are parsed as frequencies. `261.63Hz` = 0v.
 
 **Gate and Trigger Commands**: These are just shorthand so you don't have to type out a bunch of numbers for things like drum sequences which don't care about pitch or the exact voltage.
@@ -56,13 +58,16 @@ These formats are all parsed and translated into the equivalent 1v/octave contro
 - `T` or `^` for a 1ms trigger pulse (this also guarantees a rising edge, so you'll get 0v for 1ms, then 10v for 1ms, then 0v afterward), so that the output *doesn't* stay high for the entire step. This is usually what drum or clock-related modules will prefer.
 - `W` or `|` for a full-width gate; this one has no rising edge, so there will be no gap between this step and the prior step. Identical to simply writing "10" or "100%" in the cell. The basic use case is to hold a gate open from the prior step for multi-step notes.
 
-**Comments**: A question mark `?` in a cell will begin a "comment"; it and all text for the rest of that cell will be ignored and highlighted in a different color. You can use these for labels, in-line comments and notes, or anything else where seeing a little text might be helpful.
+**Comments**: A `?` in a cell will begin a "comment"; it and all text for the rest of that cell will be ignored and highlighted in a different color. You can use these for labels, in-line comments and notes, or anything else where seeing a little text might be helpful.
+
+![Spellbook shows tooltips based on first row comments](screenshots/spellbook_tooltip.png)
 
 - If there are comments in the first row, Spellbook assumes they are columns labels, and they will be shown in the tooltips for the output jacks.
 
 Refer to [RhythML](RhythML.md) for comprehensive guidelines on the syntax. Check out the manufacturer presets in the module's right click menu for examples and templates of various types of sequences, including some mad science like using Spellbook as a wavetable.
 
 ### Timing with Spellbook
+
 Sequences in Spellbook can be played step by step (e.g. using an incoming clock or other trigger source), or by "index". Importantly, RhythML itself has no concept of "time" or "duration", only "steps in a sequence". It's up to you to decide how to clock or index Spellbook to actually play a RhythML sequence, and what each "step" means- is it going to be clocked on 8th notes? Whole notes? Bars? None of the above because you're doing some modular mad science?
 
 You might step a Spellbook once per bar, for a sequence which controls the chord progression, or you might clock it on 16th notes for a drum loop.
@@ -70,16 +75,20 @@ You might step a Spellbook once per bar, for a sequence which controls the chord
 It's often useful to have one Spellbook for each musical part in your patch, so they can be sequenced and timed independantly based on the overall need of the music and the patch, and kept in sync using traditional modular methods such as a master clock and clock dividers. Spellbook makes working with multiple clock speeds really easy because RhythML sequences can be any arbitrary length; just add or remove rows.
 
 #### Steps
+
 - Step Forward / Step backward: Acts the most like a basic "clock in". Simply advances the sequences to the next or prior row each time they're triggered, wrapping around to the first step at the end. Ignored if anything is connected to the Index input.
 
 #### Index
+
 - The Index input is in Relative mode by default, where it acts like a phasor input: If you send a smooth rising sawtooth control voltage, Spellbook will set the "currently active step" as the *first* step when the Index voltage is 0v, and the *last* step when the Index is 10v, and the proportional step for every voltage in between. If you sync two Spellbooks with different length sequences to the same Phasor for their Index, this is a great way to get easy polyrhythms or polymeters.
 - Click the small gold symbol to change Index to Absolute mode. In this mode, Spellbook expects an Index voltage representing exactly which step to be on like an address: 1v sets Spellbook to step one, 2v is step two, 14v is step fourteen, and so on. If you send a higher voltage than you have number of rows, it will wrap around (for the nerds: modulo sequence length). Unlike Relative mode, even if the length of the sequence changes, the same index voltage always takes you to the same row.
 
 ## Controls and Hotkeys
+
 The Spellbook module offers a variety of hotkeys and controls for managing its interface and functionality effectively. Here is a comprehensive list of controls and hotkeys available for the Spellbook module:
 
 ### Text Field Behavior:
+
 - Click anywhere inside the text box on Spellbook's panel to enter "editing mode". You'll see a text cursor when focused. The prior sequence will continue playing "in the background", unchanged as you edit, until you "commit" your changes.
 - Edit your sequence, making sure to follow the syntax rules for RhythML.
 - Click anywhere outside the text box to leave editing mode, or press `Ctrl`+`Enter`, to "commit" the text without losing focus (so you can keep editing).
@@ -88,10 +97,14 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 - It tries to stay on the same "current step" if it can, but will modulo the current step into the new sequence length if the new sequence is shorter, which should hopefully help live-editing stay in sync without relying on frequent Resets, if you're careful.
   
 ### Special Keyboard Shortcuts:
+
 - `Ctrl`+`Enter`: Commit and parse the current text, but stay in editing mode.
 - `Ctrl`+`[` or `Ctrl`+`]`: Decreases or increases the text size.
   
 ### Additional Notes:
+
+![Spellbook at various sizes](screenshots/spellbook_resizes.jpeg)
+
 - **Resizing:** You can resize the module by dragging the right edge of the panel, to handle different numbers of columns in your sequences. I place minimized Spellbooks with one-column sequences all over my patches for short simple loops all the time.
 - **Autoscroll:** When not in editing mode, the text field autoscrolls to keep the currently "playing" step centered, so you can see what the sequence is doing as it plays.
 - **Scrolling**: While in editing mode, you can scroll up and down using the mouse wheel, or in any direction by moving the text cursor until it touches the edge of the viewport.

@@ -1,4 +1,5 @@
 # T's Musical Tools
+
 A collection of esoteric VCV Rack modules.
 
 Many are focused around seedable RNG, and/or routing polyphonic signals in useful ways such as shuffling, sorting, joining, or selecting subsets of them.
@@ -13,14 +14,18 @@ Mostly these modules are useful for routing signals and/or working with control 
 - *Or,* check [Releases](https://github.com/Jadael/TMT/releases) to install the latest release or to [install the latest preview](https://vcvrack.com/manual/Installing#Installing-Rack-plugins)
 
 ## The Modules
-- [Calendar](#calendar) - Output LFO-like signals based on local time and day, creating rising sawtooths synced with seconds, minutes, hours, days, through to years. Loosely inspired by Aria Salvatrice's "Arcane" module (try sampling Calendar as your RNG seed source!)
+
+![Collection](screenshots/collection.png)
+
+- [Calendar](#calendar) - Output LFO-like signals, synced to the local time and day based on your computer's clock. Creates rising sawtooths synced with seconds, minutes, hours, days, through to years. Loosely inspired by Aria Salvatrice's "Arcane" module (try sampling Calendar as your RNG seed source!)
 - [Sight](#sight) - A scope where time slows down over the width of the scope, letting you see a signal over different time scales simultaneously.
 - [Seed](#seed) - Get 16 random numbers, with an option to provide an RNG seed.
-- [Shuffle](#shuffle) - Randomly re-order the channels of a polyphonic signal, with an option to provide an RNG seed.
 - [Ouroboros](#ouroboros) - Step through the channels of a polyphonic signal as a sequence. Try using Seed as your sequence source! Maybe Shuffle it every two bars?
-- [Append](#append) - Combine the channels of up to 16 mono or polyphonic cables (i.e. append the multiple lists together into one big list; up to a total internal buffer of 128 channels), then output a 1 to 16 channel subset of them, with CV controls for width and starting point.
-- [Stats](#stats) - Get statistical measures like mean, median, mode, product, etc. of the channels of a polyphonic signal, inspired by spreadsheet functions like AVERAGE(), MEDIAN(), SUM(), etc.
+- [Shuffle](#shuffle) - Randomly re-order the channels of a polyphonic signal, with an option to provide an RNG seed.
 - [Sort](#sort) - Sort and select channels from a polyphonic cable using other polyphonic CV inputs, inspired by spreadsheet functions like RANK(), FILTER(), UNIQUE(), etc.
+- [Stats](#stats) - Get statistical measures like mean, median, mode, product, etc. of the channels of a polyphonic signal, inspired by spreadsheet functions like AVERAGE(), MEDIAN(), SUM(), etc.
+- [Append](#append) - Combine the channels of up to 16 mono or polyphonic cables (i.e. append the multiple lists together into one big list; up to a total internal buffer of 256 channels), then output a 1 to 16 channel subset of them, with CV controls for width and starting point.
+ - [Spine](#spine) - A few useful, static, CV operations like offsets, inverse, and reverse.
 - [Spellbook](#spellbook) - Plain text "musical markup" sequencing of CVs/pitches, with a broad variety of accepted formats for however you want to write your sequences; such as pitch names, MIDI note numbers, semitones, Hertz, etc. Write out sequences in rows and columns like a spreadsheet!
 
 ## Getting Started
@@ -45,9 +50,10 @@ This plugin pairs well with [computerscare modules](https://library.vcvrack.com/
 ---
 
 # Calendar
+
 ![Calendar](screenshots/calendar.png)
 
-Calendar generates a set of very slow LFO-like signals representing the progress through various time/calendar units. The module outputs voltages ranging from 0 to 10v, where each voltage corresponds to the current "progress" through the respective time unit.
+Calendar generates a set of very slow LFO-like signals representing the progress through various time/calendar units. The current time and date is based on your system clock and local timezone, or you can toggle to the UTC timezone. The module outputs voltages ranging from 0 to 10v, where each voltage corresponds to the current "progress" through the respective time unit, a "stepped" or "stochastic" version of the ramps where theya re rounded to the enarest subdivision, as well as some triggers and gates.
 
 - Ramps, triggers, and gates for seconds, minutes, hours, days, weeks, months, seasons, and years
 - Voltages range from 0 to 10v
@@ -56,6 +62,7 @@ Calendar generates a set of very slow LFO-like signals representing the progress
 Loosely inspired by Aria Salvatrice's "Arcane" module, which gave a new random set of pitches and rhythms each day, and gave everyone everywhere the same set each day, so you could all share this same source of RNG and inspiration in many diverse patches. Making patches with Arcane made me imagine patches which sync up to the days and seasons, which led to Calendar, which was both my first module made for this plugin and my first ever C++ project.
 
 ## Outputs
+
 Each time unit has a row of five outputs:
 
 1. Linear Ramp: A smooth, continuous voltage ranging from 0 to 10v, representing the progress through the time unit.
@@ -87,6 +94,7 @@ Calendar updates in real-time based on your computer's clock, so it's perfect fo
 ---
 
 # Sight
+
 ![Sight](screenshots/sight.png)
 
 Sight is a logarithmic oscilloscope for visualizing voltage signals in VCV Rack. Unlike traditional scopes, Sight displays time non-linearly across its horizontal axis, allowing you to observe both rapid changes and long-term trends simultaneously.
@@ -98,6 +106,7 @@ Sight is a logarithmic oscilloscope for visualizing voltage signals in VCV Rack.
 - Variable update rate: Toggle between a default 1kHz refresh rate and full audio rate processing.
 
 ## Inputs & Outputs
+
 - **Toggle Audio Rate**: By default, Sight updates at 1kHz. Toggle this to process at audio rate (CPU intensive).
 - **Voltage Input**: Connect any voltage source to this input to display its waveform on the scope.
 
@@ -134,28 +143,33 @@ Sight is particularly useful for visualizing complex modulation sources, envelop
 ---
 
 # Seed
+
 ![Seed](screenshots/seed.png)
 
-Seed is a static random voltage generator with 16 individual outputs and a polyphonic output. It generates the values based on an input voltage used as a seed for the random number generator, so you can return to the same seed/pattern if desired, or you can supply a randomly generated seed for a totally random pattern.
+Seed is a static random voltage generator with 16 individual outputs and a polyphonic output. It generates the values based on the input voltage, which is used as a seed for the random number generator, so you can return to the same seed/pattern if desired, or you can supply a randomly generated voltage for a totally random pattern.
 
 ## Key Features
+
 - 16 individual random voltage outputs
 - Polyphonic output with 16 channels
 - Seed-based random voltage generation
 - Alt Mode: Snap outputs to 0v or 10v (useful for generating gate patterns)
 
 ## Inputs and Outputs
+
 - **Seed Input**: Voltage used as the seed for random number generation. If no input is connected, a random seed is used.
 - **Poly Out**: Polyphonic output with 16 channels containing the generated random voltages.
 - **Out 1 - Out 16**: Individual outputs for each of the 16 random voltages generated.
 
 ## How It Works
+
 1. The module reads the voltage from the Seed input (or uses a random value if unconnected).
 2. It uses this seed to initialize a random number generator.
 3. The generator produces 16 random voltages between 0v and 10v.
 4. These voltages are output individually and as a polyphonic signal.
 
 ## Usage Guide
+
 Seed is designed for creating reproducible randomness in your patches:
 
 1. **Basic Usage**: Leave the Seed input unconnected, and it boots up with a randomly generated seed, giving you 16 static random voltages, each between 0 to 10.
@@ -166,18 +180,76 @@ Seed is designed for creating reproducible randomness in your patches:
 6. **Correlate Modulations**: Connect a Seed to an existing CV somewhere in your patch, and you get 16 new CVs that change along with that CV, in surprising but consistent ways. For example, maybe your effects all get modulated differently for each note in your melody, but it's always the same for the same note.
 
 ## Alt Mode
+
 Click the toggle switch at the top of the module to activate Alt Mode. In this mode, instead of outputting voltages across the full 0-10v range, Seed will round each output to 0v or 10v, effectively turning it into a random gate generator.
 
 Seed is perfect for adding controlled randomness to your patches. Use it to generate random pitches, modulation sources, or even random rhythmic patterns when in Alt Mode. The ability to control randomness via the seed input allows for repeatable "random" sequences, which can be crucial for composing with randomness or creating generative patches that can be recreated. I like [AS Triggers MkI](https://library.vcvrack.com/AS/TriggersMKI) for a quick way to set a specific voltage that gets saved with the patch when it closes, and which can be randomized with `Ctrl`+`R`.
 
 ---
 
+# Ouroboros
+
+![Ouroboros](screenshots/ouroboros.png)
+
+Ouroboros steps through the channels of a polyphonic signal, essentially turning it into a monophonic sequence. It's designed to work seamlessly with other modules in the plugin and VCV Rack's polyphonic cables.
+
+## Key Features
+
+- Converts a polyphonic input into a stepped monophonic sequence
+- CV-controlled sequence length
+- Reset and Clock inputs, behaves pretty much like any normal sequencer
+- Alt Mode: Outputs the average of current and next step voltages
+
+## Inputs and Outputs
+
+- **Poly Sequence Input**: The main polyphonic input to be sequenced.
+- **Clock Input**: Advances to the next step on each rising edge.
+- **Reset Input**: Resets the sequence to the first step. Uses Grids-style logic: if Clock is low, it arms the Reset for the next Clock; if Clock is high, it resets immediately.
+- **Length Input**: Controls the active sequence length (0v: one step, 10v: all steps).
+- **Mono Sequence Output**: The resulting monophonic sequence output.
+
+## Alt Mode
+
+Click the toggle switch at the top of the module to activate Alt Mode. In this mode, instead of outputting just the current step's voltage, Ouroboros outputs the average of the current and next step voltages. (Note: this is not a "slew" or "glide", rather the output is a static blend of two consecutive channels).
+
+## How It Works
+
+1. Ouroboros reads the voltages from each channel of the polyphonic input.
+2. On each clock pulse, it advances to the next channel.
+3. The current channel's voltage (or rolling average, in Alt Mode) is sent to the output.
+4. When it reaches the end (determined by the Length input), it loops back to the beginning.
+
+## Usage Guide
+
+Ouroboros is versatile for creating sequences from polyphonic sources:
+
+1. **Basic Sequencing**: Connect a polyphonic chord or set of CVs to turn them into a stepped sequence.
+2. **Random Patterns**: Use with Seed and Shuffle to generate evolving random sequences.
+3. **Chord Arpeggiation**: Input a polyphonic chord to create arpeggios.
+4. **CV Sequencing**: Cycle through multiple modulation sources.
+
+Remember, Ouroboros adapts to changes in your patch. If you add or remove channels from the polyphonic input, or adjust the Length input, Ouroboros will automatically adjust its sequence length.
+
+## Technical Details
+
+- The Length input scales from 1 to the number of connected input channels.
+- In Alt Mode, the output is the mean of two consecutive channels (current and next).
+  - The mean of two audio signals essentially mixes them.
+  - The mean of two control voltages gives you a control voltage halfway between them.
+- The module efficiently handles varying numbers of input channels and clock sources.
+
+Ouroboros shines in complex patches where you need to create sequences from static polyphonic sources or cycle through multiple modulation options. It's especially powerful when combined with other modules in the TMT collection, allowing for creative sequencing and routing strategies.
+
+---
+
 # Shuffle
+
 ![Shuffle](screenshots/shuffle.png)
 
 Shuffle is a module that reorders the channels of an incoming polyphonic signal, outputting a newly arranged polyphonic signal. It offers control over the number of output channels and provides a trigger input to initiate the shuffle process.
 
 ## Key Features
+
 - Polyphonic input and output (up to 16 channels)
 - Deterministic shuffling of the channels based on a seed input
 - CV control over the number of output channels
@@ -186,6 +258,7 @@ Shuffle is a module that reorders the channels of an incoming polyphonic signal,
 - Alt Mode: Allows for potential multiple selections of input channels in the output
 
 ## Inputs & Outputs
+
 - **Trigger Input**: Initiates a new shuffle of the polyphonic voltages when a rising edge is detected.
 - **Polyphonic Input**: The main input for the signals to be shuffled. Accepts up to 16 channels. If no cable is connected, a default one-octave chromatic scale is used.
 - **Seed Input**: Provides a random seed for the shuffle. The same seed always produces the same shuffle order. If unconnected, a new random seed is generated for each trigger.
@@ -193,6 +266,7 @@ Shuffle is a module that reorders the channels of an incoming polyphonic signal,
 - **Polyphonic Output**: The reordered channels based on the current shuffle.
 
 ## How It Works
+
 1. On receiving a trigger, Shuffle reorders its internal list representing the channel order.
 2. If a seed input is connected, it uses this voltage to seed its random number generator, ensuring reproducible results for the same seed.
 3. In default mode, it performs a true "shuffle" - each input channel appears exactly once in the output.
@@ -201,6 +275,7 @@ Shuffle is a module that reorders the channels of an incoming polyphonic signal,
 6. Between triggers, the module continuously passes through input voltages in the current shuffled order, allowing for dynamic input changes while maintaining the shuffle pattern.
 
 ## Usage Guide
+
 Shuffle is versatile for adding controlled randomness to your patches:
 
 1. **Basic Usage**: Connect a polyphonic signal to shuffle its channels. Trigger a new shuffle as needed.
@@ -214,78 +289,35 @@ Shuffle shines in generative patches, for creating evolving textures, or for add
 
 ---
 
-# Ouroboros
-![Ouroboros](screenshots/ouroboros.png)
-
-Ouroboros steps through the channels of a polyphonic signal, essentially turning it into a monophonic sequence. It's designed to work seamlessly with other modules in the plugin and VCV Rack's polyphonic cables.
-
-## Key Features
-- Converts a polyphonic input into a stepped monophonic sequence
-- CV-controlled sequence length
-- Reset and Clock inputs, behaves pretty much like any normal sequencer
-- Alt Mode: Outputs the average of current and next step voltages
-
-## Inputs and Outputs
-- **Poly Sequence Input**: The main polyphonic input to be sequenced.
-- **Clock Input**: Advances to the next step on each rising edge.
-- **Reset Input**: Resets the sequence to the first step. Uses Grids-style logic: if Clock is low, it arms the Reset for the next Clock; if Clock is high, it resets immediately.
-- **Length Input**: Controls the active sequence length (0v: one step, 10v: all steps).
-- **Mono Sequence Output**: The resulting monophonic sequence output.
-
-## Alt Mode
-Click the toggle switch at the top of the module to activate Alt Mode. In this mode, instead of outputting just the current step's voltage, Ouroboros outputs the average of the current and next step voltages. (Note: this is not a "slew" or "glide", rather the output is a static blend of two consecutive channels).
-
-## How It Works
-1. Ouroboros reads the voltages from each channel of the polyphonic input.
-2. On each clock pulse, it advances to the next channel.
-3. The current channel's voltage (or rolling average, in Alt Mode) is sent to the output.
-4. When it reaches the end (determined by the Length input), it loops back to the beginning.
-
-## Usage Guide
-Ouroboros is versatile for creating sequences from polyphonic sources:
-
-1. **Basic Sequencing**: Connect a polyphonic chord or set of CVs to turn them into a stepped sequence.
-2. **Random Patterns**: Use with Seed and Shuffle to generate evolving random sequences.
-3. **Chord Arpeggiation**: Input a polyphonic chord to create arpeggios.
-4. **CV Sequencing**: Cycle through multiple modulation sources.
-
-Remember, Ouroboros adapts to changes in your patch. If you add or remove channels from the polyphonic input, or adjust the Length input, Ouroboros will automatically adjust its sequence length.
-
-## Technical Details
-- The Length input scales from 1 to the number of connected input channels.
-- In Alt Mode, the output is the mean of two consecutive channels (current and next).
-  - The mean of two audio signals essentially mixes them.
-  - The mean of two control voltages gives you a control voltage halfway between them.
-- The module efficiently handles varying numbers of input channels and clock sources.
-
-Ouroboros shines in complex patches where you need to create sequences from static polyphonic sources or cycle through multiple modulation options. It's especially powerful when combined with other modules in the TMT collection, allowing for creative sequencing and routing strategies.
-
----
-
 # Append
+
 ![Append](screenshots/append.png)
 
-Append was designed to combine multiple polyphonic cables into a single polyphonic output, with control over the output's width and starting point. It's accepts both mono and polyphonic inputs, allowing for flexible signal routing and manipulation. This is not a mixer! The channels are still kept separate, as if you had them combined into a super big 256 channel polyphonic cable, and then it outputs up to 16 of them as a new polyphonic cable.
+Append was designed to combine multiple polyphonic cables into a single polyphonic output, with control over the output's width and starting point. It accepts both mono and polyphonic inputs, allowing for flexible signal routing and manipulation. This is not a mixer! The channels are appended, not mixed, as if combined into a big 256 channel cable. Then, with some controls for which channels you get, it outputs up to 16 of those channels (the max VCV Rack cables can contain) as a new polyphonic signal. This primarily gives you a way to combine two or more polyphonic signals into one, without having to Split and then Merge them.
 
 ## Key Features:
+
 - Combines up to 16 input signals (mono or polyphonic) into an internal set of up to 256 channels (up to 16 per input)
 - Outputs a customizable subset of the combined signals as a polyphonic cable
 - CV control over output "width" (number of channels to output) and "rotation" (which input channel to start counting from)
 - Handles dynamic changes in the number of incoming channels without re-patching cables
 
 ## Inputs and Outputs
+
 - **Signal 1-16 Inputs**: Connect up to 16 mono or polyphonic input signals.
 - **Width Input**: CV input to set the output width (number of channels). 0v = 1 channel, 10v = maximum available channels (up to 16).
 - **Rotation Input**: CV input to set the output starting point. 0v = start from the first channel, 10v = start from the last channel.
 - **Poly Out**: Polyphonic output containing the selected subset of voltages from the input signals.
 
 ## How It Works
+
 1. Append collects all channels from all connected input signals into a single internal buffer.
 2. The Width input determines how many channels will be included in the output (1 to 16).
 3. The Rotation input sets the starting point within the buffer for the output channels.
 4. The module outputs the selected subset of voltages as a polyphonic signal.
 
 ## Usage Guide
+
 Append is versatile for signal routing and manipulation:
 
 1. **Combining Signals**: Use it to merge multiple separate signals (mono or poly) into a single polyphonic cable.
@@ -296,6 +328,7 @@ Append is versatile for signal routing and manipulation:
 Remember, Append adapts to changes in your patch. If you add or remove input cables, or if the number of channels in polyphonic inputs changes, Append will automatically adjust its internal buffer.
 
 ## Technical Details
+
 - Internal buffer can hold up to 256 channels total (16 inputs * 16 channels each).
 - If no inputs are connected, the output will provide a number of 0v channels based on the Width input.
 - Width and Rotation inputs are clamped between 0v and 10v for predictable behavior.
@@ -305,12 +338,72 @@ Append is perfect for complex patches where you need to combine, select, or dyna
 
 ---
 
-# Stats
-![Stats](screenshots/stats.png)
+# Sort
 
-Stats is a statistical function module. It computes and outputs various statistical metrics from the signals of a polyphonic input cable.
+![Sort](screenshots/sort.png)
+
+Sort manipulates a polyphonic signal based on sorting criteria specified by another polyphonic input, and selectively outputs the channels based on a voltage threshold from a third input.
+
+- Polyphonic data sorting based on external polyphonic sort keys.
+- Channel selection based on voltage threshold.
+- Outputs multiple combinations of sorted and selected data.
 
 ## Inputs & Outputs
+
+- **Toggle Audio Rate**: By default, Sort recalculates every 10ms, which is plenty for most CV needs. Toggle this to run at audio rate, which is pretty CPU heavy, but lets you process audio signals if you want.
+
+- **Data Input**: Polyphonic signal containing the data to be sorted.
+- **Sort Input**: Polyphonic signal that determines the order of sorting for the Data input.
+  - If you hook up the random poly output from Seed to the Sort Key, that's equivalent to the Shuffle module, so you could think of Sort like a generalized, manually-controlled Shuffle.
+- **Select Input**: Polyphonic signal that determines which channels of the Data input are included in the output, based on a threshold voltage (e.g., channels with voltages above 5V are included). This doesn't just mute the channels, it removes them entirely.
+
+## Outputs
+
+- **Passthru Output**: Outputs the Data input as is, without any sorting or selection.
+- **Sorted Output**: Outputs the Data input sorted according to the Sort input.
+- **Selected Output**: Outputs only the channels of the Data input that meet the threshold criteria set by the Select input.
+- **Sorted and Selected Output**: First sorts the Data input as per the Sort input, then applies the selection criteria from the Select input.
+- **Selected and Sorted Output**: First applies the selection criteria from the Select input to the Data input, then sorts the resulting channels as per the Sort input.
+- **Ascending Output**: Outputs the channels of the Data input sorted in ascending order based on their own values.
+- **Descending Output**: Outputs the channels of the Data input sorted in descending order based on their own values.
+
+## Guide
+
+This module offers unique ways to manipulate polyphonic cables that go beyond typical VCV Rack operations.
+
+In VCV Rack, polyphonic cables carry multiple voltages at once. Usually, we might combine or separate these voltages, but Sort allows us to reorganize them in ways you might not have considered before.
+
+Imagine you have a polyphonic cable carrying multiple voltages - maybe representing a chord, or various control voltages. Sort lets you "sort" (rearrange or reorder) and "select" (choose which voltages to include or exclude) from these voltages in real-time, both of which are controlled by their own polyphonic CVs. This is basically just spreadsheet RANK() and FILTER(), if you think of your input cable as being like an "array of voltages".
+
+The module has three main inputs:
+
+1. The "Data Input" - your main polyphonic input, carrying the voltages you want to manipulate.
+2. The "Sort Key" - another polyphonic input which determines how to reorder the voltages from your Data Input. 
+3. The "Select Key" - a third polyphonic input that lets you choose which voltages from your Data Input to include or exclude.
+
+Sort then provides several outputs, each offering a different way to reorganize or choose from your original voltages:
+
+1. "Passthru" gives you your original voltages, unchanged.
+2. "Sorted" reorders your voltages based on the Sort Key. The idea is you put the lowest voltage in channel you want to be first, then the second lowest in the channel you want to become second, and so on, and when you sort them from lowest to highest, the "data" channels will be follow and be sorted in that same order. By changing this input you can re-order the data channels in any possible order.
+3. "Selected" only passes through specific channels, based on the Select Key. The matching Sort Key voltage for each channel in the data has to be 5v or greater, otherwise that channel get excluded. Note: the channel is not just muted, but rather the entire channel is skipped and not included in the output cable.
+4. "Sorted and Selected" first reorders, then chooses from your voltages.
+5. "Selected and Sorted" first chooses, then reorders your voltages. These are both available because the order of operations often matters to the result.
+6. "Ascending" and "Descending" simply order your voltages from lowest to highest or highest to lowest, ignoring the Sort and Select keys. These are just here because it would feel weird for a module named "Sort" to not have them.
+
+Sort also features an "Alt Mode" that processes at audio rate, if you want to route audio signals instead of CV. While this can be CPU-intensive, it opens up possibilities for unique sound design techniques.
+
+Remember, Sort isn't altering the individual voltages themselves, but rather changing their order and selectively passing them through. This can route signals like Shuffle, but instead of a random order you can specify any possible order and subset you want.
+
+---
+
+# Stats
+
+![Stats](screenshots/stats.png)
+
+Stats is a statistical function module. It computes and outputs various statistical metrics from the signals of a polyphonic input cable. Especially useful for control voltages, but might have some applications for audio signals as well.
+
+## Inputs & Outputs
+
 - **Toggle Audio Rate**: By default, Stats recalculates every 10ms, which is plenty for most CV needs. Toggle this to run at audio rate, which is pretty CPU heavy, but lets you process audio signals if you want.
 
 - **Polyphonic Input**: Receives the polyphonic signals to analyze.
@@ -353,65 +446,65 @@ It's one of those modules that might not seem essential at first glance, but onc
 
 ---
 
-# Sort
-![Sort](screenshots/sort.png)
+# Spine
 
-Sort manipulates a polyphonic signal based on sorting criteria specified by another polyphonic input, and selectively outputs the channels based on a voltage threshold from a third input.
+![Spine](screenshots/spine.png)
 
-- Polyphonic data sorting based on external polyphonic sort keys.
-- Channel selection based on voltage threshold.
-- Outputs multiple combinations of sorted and selected data.
+Spine is a utility module that provides a set of common voltage offsets and transformations for an input signal. It's designed to be a quick and easy way to adjust or manipulate voltages in your patch. These are useful for a lot of of the inputs of other modules in this set.
 
-## Inputs & Outputs
-- **Toggle Audio Rate**: By default, Sort recalculates every 10ms, which is plenty for most CV needs. Toggle this to run at audio rate, which is pretty CPU heavy, but lets you process audio signals if you want.
+## Key Features
 
-- **Data Input**: Polyphonic signal containing the data to be sorted.
-- **Sort Input**: Polyphonic signal that determines the order of sorting for the Data input.
-- **Select Input**: Polyphonic signal that determines which channels of the Data input are included in the output, based on a threshold voltage (e.g., channels with voltages above 5V are included).
+- Polyphonic processing (up to 16 channels)
+- Various voltage offsets and transformations
+- Alt Mode: Process at audio rate instead of every 10ms
+  - Not a very CPU intense module, but sometimes that extra performance helps
 
-## Outputs
-- **Passthru Output**: Outputs the Data input as is, without any sorting or selection.
-- **Sorted Output**: Outputs the Data input sorted according to the Sort input.
-- **Selected Output**: Outputs only the channels of the Data input that meet the threshold criteria set by the Select input.
-- **Sorted and Selected Output**: First sorts the Data input as per the Sort input, then applies the selection criteria from the Select input.
-- **Selected and Sorted Output**: First applies the selection criteria from the Select input to the Data input, then sorts the resulting channels as per the Sort input.
-- **Ascending Output**: Outputs the channels of the Data input sorted in ascending order based on their own values.
-- **Descending Output**: Outputs the channels of the Data input sorted in descending order based on their own values.
+## Inputs and Outputs
 
-## Guide
+- **X Input**: The main input signal to be transformed. If disconnected, `X` is 0.
+- **Zero Output**: Passes through the input signal unchanged `X + 0v`
+- **Add 1V Output**: Adds 1 volt to the input signal `X + 1v`
+- **Sub 1V Output**: Subtracts 1 volt from the input signal `X - 1v`
+- **Add 5V Output**: Adds 5 volts to the input signal `X + 5v`
+- **Sub 5V Output**: Subtracts 5 volts from the input signal `X - 5v`
+- **Add 10V Output**: Adds 10 volts to the input signal `X + 10v`
+- **Sub 10V Output**: Subtracts 10 volts from the input signal `X - 10v`
+- **Inverse Output**: Inverts the polarity of the input signal `X * -1`
+- **Reverse Output**: Reverses the voltage range `10v - X`
 
-This module offers unique ways to manipulate polyphonic cables that go beyond typical VCV Rack operations.
+## How It Works
 
-In VCV Rack, polyphonic cables carry multiple voltages at once. Usually, we might combine or separate these voltages, but Sort allows us to reorganize them in ways you might not have considered before.
+1. Spine reads the voltage(s) from the `X` input.
+2. It applies the various transformations to each channel of the input signal.
+3. The transformed voltages are sent to the corresponding outputs.
+4. All outputs maintain the same number of polyphonic channels as the input.
 
-Imagine you have a polyphonic cable carrying multiple voltages - maybe representing a chord, or various control voltages. Sort lets you "sort" (rearrange or reorder) and "select" (choose which voltages to include or exclude) from these voltages in real-time, both of which are controlled by their own polyphonic CVs. This is basically just spreadsheet RANK() and FILTER(), if you think of your input cable as being like an "array of voltages".
+## Usage Guide
 
-The module has three main inputs:
-1. The "Data Input" - your main polyphonic input, carrying the voltages you want to manipulate.
-2. The "Sort Key" - another polyphonic input which determines how to reorder the voltages from your Data Input. 
-3. The "Select Key" - a third polyphonic input that lets you choose which voltages from your Data Input to include or exclude.
+Spine is versatile for quick voltage adjustments:
 
-Sort then provides several outputs, each offering a different way to reorganize or choose from your original voltages:
+1. **Offsets**: Use the Add and Sub outputs to shift your voltages up or down by common amounts.
+2. **Inversion**: The Inverse output flips the sign of your voltage, useful for creating inverse modulations.
+3. **Reversal**: The Reverse output can be used to create "backwards" or "upside down" CV ranges, where 0v becomes 10v and vice versa.
 
-1. "Passthru" gives you your original voltages, unchanged.
-2. "Sorted" reorders your voltages based on the Sort Key. The idea is you put the lowest voltage in channel you want to be first, then the second lowest in the channel you want to become second, and so on, and when you sort them from lowest to highest, the "data" channels will be follow and be sorted in that same order. By changing this input you can re-order the data channels in any possible order.
-3. "Selected" only passes through specific channels, based on the Select Key. The matching Sort Key voltage for each channel in the data has to be 5v or greater, otherwise that channel get excluded. Note: the channel is not just muted, but rather the entire channel is skipped and not included in the output cable.
-4. "Sorted and Selected" first reorders, then chooses from your voltages.
-5. "Selected and Sorted" first chooses, then reorders your voltages. These are both available because the order of operations often matters to the result.
-6. "Ascending" and "Descending" simply order your voltages from lowest to highest or highest to lowest, ignoring the Sort and Select keys. These are just here because it would feel weird for a module named "Sort" to not have them.
+Remember, Spine processes polyphonic signals, so you can transform entire chords or complex CV setups at once.
 
-Sort also features an "Alt Mode" that processes at audio rate, if you want to route audio signals instead of CV. While this can be CPU-intensive, it opens up possibilities for unique sound design techniques.
+## Alt Mode
 
-Remember, Sort isn't altering the individual voltages themselves, but rather changing their order and selectively passing them through. This can route signals like Shuffle, but instead of a random order you can specify any possible order and subset you want.
+Click the toggle switch at the top of the module to activate Alt Mode. In this mode, Spine processes at audio rate instead of every 10ms. This allows for audio-rate modulations and can be used for creative sound design, but is more CPU intensive.
+
+Spine is perfect for patches where you frequently need to adjust voltage levels or create variations of a control signal. It's especially useful in complex patches where you need quick access to common voltage transformations without adding multiple utility modules.
 
 ---
 
 # Spellbook
+
 ![Spellbook](screenshots/spellbook.png)
 
 Spellbook is a module for VCV Rack to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs, each of which outputs a voltage controlled by the corresponding column in RhythML-formatted text input.
 
 ## Inputs & Outputs
+
 - **Step Forward**: Advances to the next step in the sequence on the rising edge of a trigger.
 - **Step Backward**: Advances to the prior step in the sequence on the rising edge of a trigger.
 - **Reset Input**: Resets the sequence to the first step on the rising edge of the input signal.
@@ -432,7 +525,7 @@ If plaintext and spreadsheets make sense to you, you might like Spellbook. Very 
 
 If other sequencers don't jive with you, give Spellbook a try, but be warned: it is weird.
 
-Spellbook sequences are programmed using the RhythML format, a syntax to define pitch and CV patterns in plain text. Sort of a "tablature" or "markup" vibe, rather than "scripting" or "coding" (there are no conditional branching, or calculations, or loops, or anything like that). Each row in the sequence represents one step, typically triggered sequentially by the "Step Forward" input. Text written in each "column" (defined by the commas) is parsed to determine what voltage to send to the corresponding output jack (one per column) for the current step.
+Spellbook sequences are described in plain text using the RhythML format, a syntax to define pitch and CV patterns in plain text. Sort of a "tablature" or "markup" vibe, rather than "scripting" or "coding" (there is no conditional branching, or calculations, or loops, or anything like that). Each row in the sequence represents one step, typically triggered sequentially by the "Step Forward" input. Text written in each "column" (defined by the commas) is parsed to determine what voltage to send to the corresponding output jack (one per column) for the current step.
 
 ### RhythML Syntax Quick Start
 
@@ -466,11 +559,14 @@ These formats are all parsed and translated into the equivalent 1v/octave contro
 
 **Comments**: A `?` in a cell will begin a "comment"; it and all text for the rest of that cell will be ignored and highlighted in a different color. You can use these for labels, in-line comments and notes, or anything else where seeing a little text might be helpful.
 
+![Spellbook shows tooltips based on first row comments](screenshots/spellbook_tooltip.png)
+
 - If there are comments in the first row, Spellbook assumes they are columns labels, and they will be shown in the tooltips for the output jacks.
 
 Refer to [RhythML](RhythML.md) for comprehensive guidelines on the syntax. Check out the manufacturer presets in the module's right click menu for examples and templates of various types of sequences, including some mad science like using Spellbook as a wavetable.
 
 ### Timing with Spellbook
+
 Sequences in Spellbook can be played step by step (e.g. using an incoming clock or other trigger source), or by "index". Importantly, RhythML itself has no concept of "time" or "duration", only "steps in a sequence". It's up to you to decide how to clock or index Spellbook to actually play a RhythML sequence, and what each "step" means- is it going to be clocked on 8th notes? Whole notes? Bars? None of the above because you're doing some modular mad science?
 
 You might step a Spellbook once per bar, for a sequence which controls the chord progression, or you might clock it on 16th notes for a drum loop.
@@ -478,16 +574,20 @@ You might step a Spellbook once per bar, for a sequence which controls the chord
 It's often useful to have one Spellbook for each musical part in your patch, so they can be sequenced and timed independantly based on the overall need of the music and the patch, and kept in sync using traditional modular methods such as a master clock and clock dividers. Spellbook makes working with multiple clock speeds really easy because RhythML sequences can be any arbitrary length; just add or remove rows.
 
 #### Steps
+
 - Step Forward / Step backward: Acts the most like a basic "clock in". Simply advances the sequences to the next or prior row each time they're triggered, wrapping around to the first step at the end. Ignored if anything is connected to the Index input.
 
 #### Index
+
 - The Index input is in Relative mode by default, where it acts like a phasor input: If you send a smooth rising sawtooth control voltage, Spellbook will set the "currently active step" as the *first* step when the Index voltage is 0v, and the *last* step when the Index is 10v, and the proportional step for every voltage in between. If you sync two Spellbooks with different length sequences to the same Phasor for their Index, this is a great way to get easy polyrhythms or polymeters.
 - Click the small gold symbol to change Index to Absolute mode. In this mode, Spellbook expects an Index voltage representing exactly which step to be on like an address: 1v sets Spellbook to step one, 2v is step two, 14v is step fourteen, and so on. If you send a higher voltage than you have number of rows, it will wrap around (for the nerds: modulo sequence length). Unlike Relative mode, even if the length of the sequence changes, the same index voltage always takes you to the same row.
 
 ## Controls and Hotkeys
+
 The Spellbook module offers a variety of hotkeys and controls for managing its interface and functionality effectively. Here is a comprehensive list of controls and hotkeys available for the Spellbook module:
 
 ### Text Field Behavior:
+
 - Click anywhere inside the text box on Spellbook's panel to enter "editing mode". You'll see a text cursor when focused. The prior sequence will continue playing "in the background", unchanged as you edit, until you "commit" your changes.
 - Edit your sequence, making sure to follow the syntax rules for RhythML.
 - Click anywhere outside the text box to leave editing mode, or press `Ctrl`+`Enter`, to "commit" the text without losing focus (so you can keep editing).
@@ -496,10 +596,14 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 - It tries to stay on the same "current step" if it can, but will modulo the current step into the new sequence length if the new sequence is shorter, which should hopefully help live-editing stay in sync without relying on frequent Resets, if you're careful.
   
 ### Special Keyboard Shortcuts:
+
 - `Ctrl`+`Enter`: Commit and parse the current text, but stay in editing mode.
 - `Ctrl`+`[` or `Ctrl`+`]`: Decreases or increases the text size.
   
 ### Additional Notes:
+
+![Spellbook at various sizes](screenshots/spellbook_resizes.jpeg)
+
 - **Resizing:** You can resize the module by dragging the right edge of the panel, to handle different numbers of columns in your sequences. I place minimized Spellbooks with one-column sequences all over my patches for short simple loops all the time.
 - **Autoscroll:** When not in editing mode, the text field autoscrolls to keep the currently "playing" step centered, so you can see what the sequence is doing as it plays.
 - **Scrolling**: While in editing mode, you can scroll up and down using the mouse wheel, or in any direction by moving the text cursor until it touches the edge of the viewport.
@@ -508,7 +612,7 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 
 # Basics of VCV Rack
 
-VCV Rack is virtual modular synthesizer platform for Windows/Mac/Linux that simulates Eurorack modules, in addition to original modules that go beyond hardware. You place modules on a grid, interact with their knobs, sliders, and buttons with your mouse, and connect their input and output jacks with virtual cables to create synth patch just like a physical eurorack.
+VCV Rack is virtual modular synthesizer platform for Windows/Mac/Linux that simulates Eurorack modules, in addition to original modules that go beyond hardware. You place modules on a grid, interact with their knobs, sliders, and buttons with your mouse, and connect their input and output jacks with virtual cables to create synth patches just like a physical eurorack.
 
 Spellbook is a module for VCV Rack, and RhythML was designed with VCV Rack, and modular synthesis in general, in mind.
 
@@ -517,7 +621,9 @@ All signals in VCV Rack are virtual voltages, but they can classified roughly in
 - Audio signals are audible if played through your speakers. They contain audio-rate frequencies typically between 20Hz to 20kHz.
 CV (control voltage) signals can modulate parameters of other modules. For example, an LFO (low-frequency oscillator) can oscillate the pitch of a VCO (voltage-controlled oscillator) or the volume level of a VCA (voltage-controlled amplifier).
 - 1v/oct (1 volt per octave) signals are CV signals that represent a pitch or note. In this standard, an increase of 1V increases the pitch by 1 octave. Since there are 12 semitones in an octave, an increase of 1/12v increases the pitch by 1 semitone.
-- Gate signals are treated like an on/off signal. 0v represents "off", and a positive voltage (typically 10v, but some modules define ">5v" or ">1v") represents "on". For example, the core MIDI module outputs a pitch signal and gate signal when a key is pressed, which can be sent to the pitch CV of an oscillator, and the trigger of an evelope generator, respectively.
+- Gate signals are treated like an on/off signal. A "low" signal represents "off", and a "high" voltage represents "on".
+  - Typically you would send 0v for low, and 5v-10v for high. The standard for modules is to define 1v or more as "high".
+  - For example, the core MIDI module outputs a separate pitch signal and gate signal when a key is pressed, which could be sent to the pitch CV of an oscillator, and the trigger/gate of an envelope generator, respectively.
 - Trigger signals are very short gates (usually around 1 millisecond), typically used for cases where the "length" of the gate is meaningless, like a drum trigger, or a clock pulse.
 - Clock pulses are triggers played at a steady tempo, in order to set the musical timing of your patch. Anything that sends a steady pulse can become a clock, such as an square wave LFO.
 
@@ -525,11 +631,12 @@ Signals can be connected from module to module via patch cables. It doesn’t ma
 
 ## Polyphonic Cables
 
-In VCV Rack, "polyphonic cables" refers to the ability of a single cable to carry multiple voltages simultaneously. This might be multiple pitches, in the traditional sense of "polyphony", but reall it's just ANY set of multiple voltages in one cable. This is a powerful feature that allows for complex patches with fewer visible connections.
+In VCV Rack, "polyphonic cables" refers to the ability of a single cable to carry multiple voltages simultaneously. This could be multiple pitches, in the traditional sense of "polyphony", but really it can be ANY set of voltages in one cable. This is a powerful feature that allows for complex patches with fewer visible connections.
 
 - A polyphonic cable in VCV Rack can carry up to 16 separate channels of voltage.
 - Polyphonic cables appear thicker than monophonic cables in the interface.
 - Each channel in a polyphonic cable is its own independent voltage, like a regular (monophonic) cable, and modules might process them in parallel, in sequence, or use them in other ways.
+  - If sent to a monophonic module, they usually read only the first channel, but polyphonic modules can do all sorts of things with the extra channels.
 
 ### Playing with Polyphonic Cables with T's Musical Tools
 
@@ -545,9 +652,12 @@ Many modules in T's Musical Tools are designed to manipulate polyphonic cables i
 
 5. **Sort**: Provides advanced sorting and selection of channels within a polyphonic signal, controlled by other polyphonic CVs.
 
+6. **Spellbook**: Using the polyphonic output, Spellbook can sequence any complex polyphonic pattern to be fed into other modules.
+
 ---
 
 # License
+
 T's Musical Tools (TMT) - A collection of esoteric modules for VCV Rack, focused on manipulating RNG and polyphonic signals.
 Copyright (C) 2024  T
 
