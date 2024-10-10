@@ -1,0 +1,25 @@
+\usepackage{fancyvrb}
+\usepackage{xcolor}
+\usepackage{framed}
+
+\definecolor{shadecolor}{rgb}{0.95,0.95,0.95}
+
+\fvset{
+  frame=single,
+  numbers=left,
+  framesep=3mm,
+  fontsize=\footnotesize,
+  baselinestretch=1.2,
+  tabsize=4
+}
+
+\DefineVerbatimEnvironment{Verbatim}{Verbatim}{}
+
+\renewenvironment{Shaded}
+ {\begin{snugshade}\begin{minipage}{\linewidth}}
+ {\end{minipage}\end{snugshade}}
+
+\usepackage{caption}
+\DeclareCaptionFont{white}{\color{white}}
+\DeclareCaptionFormat{listing}{\colorbox{gray}{\parbox{\textwidth}{#1#2#3}}}
+\captionsetup[lstlisting]{format=listing,labelfont=white,textfont=white}

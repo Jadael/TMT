@@ -553,6 +553,8 @@ If other sequencers don't jive with you, give Spellbook a try, but be warned: it
 
 Spellbook sequences are described in plain text using the RhythML format, a syntax to define pitch and CV patterns in plain text. Sort of a "tablature" or "markup" vibe, rather than "scripting" or "coding" (there is no conditional branching, or calculations, or loops, or anything like that). Each row in the sequence represents one step, typically triggered sequentially by the "Step Forward" input. Text written in each "column" (defined by the commas) is parsed to determine what voltage to send to the corresponding output jack (one per column) for the current step.
 
+[Introduction to Spellbook & RhythML | VCV Rack - YouTube](https://www.youtube.com/watch?v=c-NcPl_jUOc)
+
 ### RhythML Syntax Quick Start
 
 Ultimately, every output is merely a simple voltage, but the syntax allows you to "express" a desired voltage in a variety of ways; whichever works best in context and for your brain. You don't even have to stay consistent from row to row or column to column.
@@ -579,9 +581,9 @@ These formats are all parsed and translated into the equivalent 1v/octave contro
 
 **Gate and Trigger Commands**: These are just shorthand so you don't have to type out a bunch of numbers for things like drum sequences which don't care about pitch or the exact voltage.
 
-- `X` or `_` for a 10v output which guarantees a rising edge when the step begins even if the output was already at 10v, by dropping to 0v for the first 1ms.
-- `T` or `^` for a 1ms trigger pulse (this also guarantees a rising edge, so you'll get 0v for 1ms, then 10v for 1ms, then 0v until the next step), so that the output *doesn't* stay high for the entire step. This is usually what drum or clock-related modules will prefer.
 - `W` or `|` for a full-width gate; this one has no rising edge, so there will be no gap between this step and the prior step. This is identical to simply writing "10" or "100%" in the cell. The basic use case is to hold a gate open from the prior step for multi-step gates.
+- `T` or `^` for a 1ms trigger pulse (this also guarantees a rising edge, so you'll get 0v for 1ms, then 10v for 1ms, then 0v until the next step), so that the output *doesn't* stay high for the entire step. This is usually what drum or clock-related modules will prefer.
+- `X` or `_` for retrigger, a 10v output which guarantees a rising edge when the step begins even if the output was already at 10v, by dropping to 0v for the first 1ms.
 
 **Comments**: A `?` in a cell will begin a "comment"; it and all text for the rest of that cell will be ignored and highlighted in a different color. You can use these for labels, in-line comments and notes, or anything else where seeing a little text might be helpful.
 

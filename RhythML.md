@@ -2,9 +2,9 @@
 
 RhythML is a plaintext format designed to sequence pitch and CV patterns in a eurorack-style environment. The format is agnostic to what you are using each output for, which allows for specifying both rhythmic triggers and melodic sequences in a compact, easily editable, human readable text format.
 
-Right now, RhythML is only implemented in one place: the 'Spellbook' module for VCV Rack. However, the format is meant to be platform/technology agnostic. In the future, look out for plugins and standalone tools to convert RhythML to and from other common musical notations, or use it in common apps and music writing tools.
+Right now, RhythML is only implemented in one place: the ['Spellbook' module for VCV Rack](https://github.com/Jadael/TMT). However, the format is meant to be platform/technology agnostic. In the future, we would love to create or see others create plugins and standalone tools to convert RhythML to and from other common musical notations, or use it in common apps and music writing tools.
 
-Below is a detailed specification of the RhythML syntax as implemented by the `Spellbook` VCV Rack module. Because Spellbook is a VCV Rack module, pitches and percentages are translated into 1v/octave. In other systems, RhythML should be translated into appropriate signals for that system. For example, if there were a RhythML module as a VST plugin for your DAW, it would most likely output everything as MIDI instead of voltages.
+Below is a detailed specification of the RhythML syntax, mostly as implemented by the `Spellbook` VCV Rack module. Within the context of Spellbook as a VCV Rack module, pitches and percentages are translated into 1v/octave. In other contexts, RhythML would be translated into appropriate signals for that system. For example, if there were a RhythML module as a VST plugin for your DAW, it would most likely output everything as MIDI, with output ranges of 0-127 instead of voltages.
 
 ### Basic Structure
 
@@ -13,7 +13,7 @@ RhythML is structured like a comma separated spreadsheet, or "CSV":
 - **Rows**: Each row in the text corresponds to one sequence step.
   - You can have as many or as few rows in a sequence as you like.
   - Sequences are usually played sequentially, for example by stepping to the next line on each clock pulse.
-  - Unlike MIDI or sheet music, the steps don't know or tell you how "long" they are; they are stochastic steps in a sequence.
+  - Unlike MIDI or sheet music, the steps don't specify how "long" they are; they are just steps in a sequence.
 - **Columns**: Individual values within a row are separated by commas `,` to create columns.
   - Each column corresponds to one output signal.
   - You can have as many or as few columns in a sequence as you like.
@@ -26,28 +26,11 @@ RhythML is NOT an attempt at adapting traditional sheet music into plaintext, no
 
 Unlike MIDI or a Tracker, you're not specifiying "note events" with a pitch, duration, etc., but rather you should think in a modular synth way: each cell is parsed and converted into an output value (such as a voltage), which can be used in your patches however you like. For most use cases you'll need separate columns/voltages for each parameter you want to control: pitch, gate/trigger/envelope, velocity, filter cutoff, pulse width, etc.
 
+Conceptually, it's really just a grid sequencer, but with text input instead of a series of knobs or buttons for each step. This means you can have sequences of any length, and any number of channels. Just use commas for more columns, and more lines for more steps.
+
 Steps don't have an intrinsic "duration"; each step is just the next step in the sequence. With a complex patch you could even do weird things like play sequences backwards, or with a dynamically changing clock speed (you could even control the speed of the clock triggering a RhythML sequence using one of the columns in that very sequence- remember, the secret of modular is that control voltages can do basically *anything*, at many different levels of abstraction in your music!), or other such modular tricks.
 
 The idea is to be able to quickly and easily type out or edit a sequence in a modular synth (especially VCV Rack) context. Anything you could send a voltage to, you can control with a RhythML sequence. Every music notation system has its own strengths, weaknesses, and intentions (sheet music compresses time to make printing and sightreading easier, for example), and this is not meant to replace any of them.
-
-```
-0 ? Decimal                                         , T ? Trigger
-1.0 ? text after ? is ignored (for comments)!       , X ? Gate with retrigger
--1 ? row 1 comments become output labels            , W ? Full width gate
-1 ? (sorry no row 0 / header row... yet!)           , | ? alternate full width gate
-                                                    , |
-? Empty cells retain the prior/current output...    , ? ...except after gates/trigger symbols, for convenience
-                                                    , 
-C4 ? It also parses note names to 1v/oct...         , X
-C ? (octave 4 is the default if left out)           , X
-m60 ? ...or MIDI note numbers like `m60`...         , X
-s7 ? ...or semitones from C4 like `s7`.             , X
-10% ? ...or percentages! (useful for velocity)      , X
-? Important !!! This is not a Tracker !!!           , 
-C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger column
-                                                    , X ? or triggers from somewhere else
-? Or use columns for ANY CV                         , | ? Think modular!
-```
 
 The syntax lets you think and write in note names, or voltages, or percentages, or gates and triggers, or whatever other format makes sense to you based on what you're going to use that resulting output voltage for in your patch- which in modular could be *anything*.
 
@@ -68,14 +51,15 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
    - *Anything that parses to a floating point value is allowed, but note Eurorack/VCV Rack convention is to stay within -10 to +10 volts, with a 10 volt range between min and max value of a given signal, and some modules may behave strangely or not accept voltages outside their expectations.*
 
 2. **Gate and Trigger Commands**:
-   - `X` or `R` or `_`: Outputs 0 volts for the first 1ms of the step, then a high signal (10 volts) for the remainder.
-	  - Guarantees a rising edge, regardless of the prior step, and holds a high signal afterward.
-   - `T` or `^`: Outputs 0v for 1ms, then 10v for 1ms, then 0v thereafter.
-      - Guarantees a rising edge, regardless of the prior step, and holds a low signal afterward.
-   - `W` or `|`: Outputs a full width gate signal (10 volts), equivalent to writing `10` in the cell.
-      - Use this to continue a gate across steps.
+   - `W` or `|`: Outputs a full width gate signal (10 volts). This is identical to writing `0` or `100%` in the cell.
+      - Use this to hold a gate open for the entire step.
       - If the output is already high from a prior retrigger or gate, this will NOT create a new rising edge in the signal.
        - *Gates (as with all signals except for Triggers and Retriggers) are 100% width; two consecutive gates will output a continuous signal with no break or edge.*
+   - `T` or `^`: Trigger pulse. Outputs 0v for 1ms, then 10v for 1ms, then 0v thereafter.
+      - Guarantees a rising edge, regardless of the prior step, and holds a low signal afterward.
+   - `X` or `R` or `_`: This is a retrigger, and is often a good default, with caveats. This outputs 0 volts for the first 1ms of the step, then a high signal (10 volts) for the remainder.
+	  - This guarantees a rising edge, regardless of the prior step, then holds a high 10v gate/signal afterward.
+   - Gate vs. Trigger vs. Retrigger: Triggers leave the signal low for the duration of the step, so when you're mixing multiple sources, triggers "stay out of each others way" better, while if a gate is already high, more triggers won't have an effect. Sometimes you want one or the other, or retriggers give you a happy medium.
 
 3. **Scientific Pitch Names**:
    - Format: `<NoteName>[Accidental(s)][Octave]`
@@ -115,7 +99,8 @@ Each cell in a grid can contain values in one of these formats. Every cell is pa
    - *This scaling is specific to eurorack. If you are implementing RhythML in another environment, percentages should be translated according to the standards of that environment. For example, if you were parsing RhythML into MIDI, 0%-100% might become 0-127.*
 
 9. **Empty Cells**:
-   - An empty cell or a cell containing only whitespace or comments will leave the output's current voltage as-is, unless that "current voltage" was from a gate, trigger, or retrigger, in which case it reverts to 0.0.
+   - An empty cell or a cell containing only whitespace or comments will leave the output's current voltage as-is, so you only have to enter values on steps where a change is desired
+   - The exception to this is rows following trigger/gate commands: if the previous value was a gate, an empty cell reverts to 0v/0%, so you don't need to manually "close" every gate.
 
 Note that unlike MIDI or a Tracker, a single cell with a pitch in it does NOT automatically generate an associated gate or "note on", it just outputs one voltage for each column, like any typical eurorack CV sequencer. You would need to sequence the rhythm you want using another column, or handle rhythm with another module such as a clock or another sequencer (potentially even another Spellbook module!).
 
@@ -128,21 +113,21 @@ Example:
 
 `5.0 ? This is a comment, 5.5 ? You can put a comment in any cell`
 
-Consider using comments as labels:
+Consider using comments in the first row as labels (every cell can have its own comment):
 
 ```
-E4 ? Pitch, X ? Gate, 10 ? Velocity
-C5        , X       , 8
-D5        , X       , 6
-B4        , X       , 5
+E4 ? Pitch, X ? Gate, 100% ? Velocity
+C5        , X       , 80%
+D5        , X       , 60%
+B4        , X       , 50%
 ```
 
 Or to explain musical intentions:
 
 ```
-70% ? Melody volume, 50% ? Backing volume, 0% ? Drum chance,  0% ? Reverb, 35% ? Filter, ? NOTES - Soft start - no drums - slight reverb - mild filter
-70%                , 50%                 , 0%              ,  0%         , 35%         , ? Continue soft intro
-80%                , 60%                 , 30%             , 50%         , 40%         , ? Increase all volumes - introduce drums sporadically
+70% ? Melody, 50% ? Backing, 0% ? Drum, ? NOTES
+70%         , 50%          , 0%       , ? Continue soft intro
+80%         , 60%          , 30%      , ? Increase all volumes
 ```
 
 ### Whitespace
@@ -150,15 +135,41 @@ Or to explain musical intentions:
 - Cells are normalized during editing such that each cell in a column has uniform spacing padded with spaces to align columns vertically for readability.
 	- Blank lines are NOT ignored, and will become new blank rows, with commas added automatically.
 
+### Timing
+
+Sequences are typically played step by step (e.g. using an clock or other trigger source), but you might move or access steps in the sequence in complex modular ways as well.
+
+Importantly, RhythML itself has no concept of "time" or "duration", only "steps in a sequence". It's up to you to decide how to clock or otherwise move through a sequence to actually "play" it, and what each "step" means in the context of the music- is it going to be clocked on 8th notes? Whole notes? Bars? None of the above because you're doing some modular mad science?
+
+It's often useful to have one sequence for each musical "layer of absraction", so they can be sequenced and timed independantly based on the overall need of the music or the patch, and kept in sync using traditional timing methods such as a master clock and clock dividers. RhythML makes working with multiple clock speeds easy because RhythML sequences can be any arbitrary length; just add or remove rows.
+
+You might step one sequence once per bar, for the chord progression, then you might clock a drum loop in another sequence on 16th notes.
+
+Or you could compose an entire performance in one long sequence, hundreds or thousands of steps long; taking advantage of the ability to copy & paste to build complex meta-patterns.
+
+#### Gates, Triggers, Retriggers, and Clocks
+
+Triggers, gates, retriggers, and clocks are all types of control signals used in modular synthesis, often overlapping in functionality but with distinct characteristics.
+
+- A trigger is a short pulse, typically 1ms long, used to initiate events like starting an envelope or advancing a sequencer.
+
+- A gate is a sustained on/off signal, often used to control the duration of a note or effect.
+
+- A retrigger combines aspects of both: it starts with a brief low pulse (like a trigger) before going high (like a gate), ensuring a new event is initiated even if the signal was already high.
+
+- Clocks are a series of regular trigger or gate signals used to synchronize timing across a system.
+
+While distinct, these signals often serve similar purposes: a clock could be used as a trigger source, a gate could be used where a trigger is expected (many modules accept either), and creative patching often blurs the lines between these signal types in practice.
+
 ### Usage Example
 
 Here's a simple RhythML sequence to get started:
 
 ```
-E4 ? Pitch, X ? Gate, 10 ? Velocity
-C5        , X       , 8
-D5        , X       , 6
-B4        , X       , 5
+E4 ? Pitch, X ? Gate, 100% ? Velocity
+C5        , X       , 80%
+D5        , X       , 60%
+B4        , X       , 50%
 ```
 
 In this example, each step (row) sets a pitch in column 1, uses column 2 for triggers, and controls a velocity CV in column 3. The sequence is isntructions that play a C major arpeggio, one note per step, and gradually lowering the velocity on each note. The labels, like `? Pitch`, are ignored because of the `?`.
@@ -166,14 +177,14 @@ In this example, each step (row) sets a pitch in column 1, uses column 2 for tri
 Here's the same arpeggio, but with a little more rhythmic variation, as an 8 step sequence instead of 4:
 
 ```
-E4 ? Pitch, X ? Gate, 10 ? Velocity
-          , |       , 
-          , |       , 
-C5        , X       , 8
-D5        , X       , 6
-          ,         , 
-B4        , X       , 5
-          ,         , 
+E4 ? Pitch, X ? Gate     , 10 ? Velocity
+          , | ? hold     , 
+          , |            , 
+C5        , X ? retrigger, 8
+D5        , X            , 6
+          , ? rest       , 
+B4        , X            , 5
+          ,              , 
 ```
 
 Notice the way this pattern holds the first note for multiple steps by using `|` gates.
@@ -244,38 +255,158 @@ This pattern has one column for each drum on the VCV Rack core module "Drums", a
 #### 32-step single-cycle wave forms:
 
 ```
-0.000 ?Sine, 0.625 ?Triangle, -5 ?Saw, 5 ?RevSaw, 5 ?Square, 5 ?ShortPulse, 5 ?LongPulse, 0 ?Noise
-0.9755     , 1.2500         , -4.6774, 4.6774   , 5.0000   , 5.0000       , 5.0000      , -5.0000
-1.9135     , 1.8750         , -4.3548, 4.3548   , 5.0000   , 5.0000       , 5.0000      , -1.0000
-2.7780     , 2.5000         , -4.0323, 4.0323   , 5.0000   , 5.0000       , 5.0000      , 3.0000
-3.5355     , 3.1250         , -3.7097, 3.7097   , 5.0000   , 5.0000       , 5.0000      , -2.0000
-4.1575     , 3.7500         , -3.3871, 3.3871   , 5.0000   , 5.0000       , 5.0000      , 0.0000
-4.6195     , 4.3750         , -3.0645, 3.0645   , 5.0000   , 5.0000       , 5.0000      , -2.0000
-4.9040     , 5.0000         , -2.7419, 2.7419   , 5.0000   , 5.0000       , 5.0000      , -4.0000
-5.0000     , 4.3750         , -2.4194, 2.4194   , 5.0000   , -5.0000      , 5.0000      , -5.0000
-4.9040     , 3.7500         , -2.0968, 2.0968   , 5.0000   , -5.0000      , 5.0000      , -5.0000
-4.6195     , 3.1250         , -1.7742, 1.7742   , 5.0000   , -5.0000      , 5.0000      , 4.0000
-4.1575     , 2.5000         , -1.4516, 1.4516   , 5.0000   , -5.0000      , 5.0000      , -1.0000
-3.5355     , 1.8750         , -1.1290, 1.1290   , 5.0000   , -5.0000      , 5.0000      , 1.0000
-2.7780     , 1.2500         , -0.8065, 0.8065   , 5.0000   , -5.0000      , 5.0000      , 5.0000
-1.9135     , 0.6250         , -0.4839, 0.4839   , 5.0000   , -5.0000      , 5.0000      , 1.0000
-0.9755     , 0.0000         , -0.1613, 0.1613   , 5.0000   , -5.0000      , 5.0000      , -1.0000
-0.0000     , -0.6250        , 0.1613 , -0.1613  , -5.0000  , -5.0000      , 5.0000      , -5.0000
--0.9755    , -1.2500        , 0.4839 , -0.4839  , -5.0000  , -5.0000      , 5.0000      , 5.0000
--1.9135    , -1.8750        , 0.8065 , -0.8065  , -5.0000  , -5.0000      , 5.0000      , -2.0000
--2.7780    , -2.5000        , 1.1290 , -1.1290  , -5.0000  , -5.0000      , 5.0000      , 0.0000
--3.5355    , -3.1250        , 1.4516 , -1.4516  , -5.0000  , -5.0000      , 5.0000      , -1.0000
--4.1575    , -3.7500        , 1.7742 , -1.7742  , -5.0000  , -5.0000      , 5.0000      , -2.0000
--4.6195    , -4.3750        , 2.0968 , -2.0968  , -5.0000  , -5.0000      , 5.0000      , -2.0000
--4.9040    , -5.0000        , 2.4194 , -2.4194  , -5.0000  , -5.0000      , 5.0000      , 4.0000
--5.0000    , -4.3750        , 2.7419 , -2.7419  , -5.0000  , -5.0000      , -5.0000     , -4.0000
--4.9040    , -3.7500        , 3.0645 , -3.0645  , -5.0000  , -5.0000      , -5.0000     , 1.0000
--4.6195    , -3.1250        , 3.3871 , -3.3871  , -5.0000  , -5.0000      , -5.0000     , 1.0000
--4.1575    , -2.5000        , 3.7097 , -3.7097  , -5.0000  , -5.0000      , -5.0000     , 5.0000
--3.5355    , -1.8750        , 4.0323 , -4.0323  , -5.0000  , -5.0000      , -5.0000     , -2.0000
--2.7780    , -1.2500        , 4.3548 , -4.3548  , -5.0000  , -5.0000      , -5.0000     , 3.0000
--1.9135    , -0.6250        , 4.6774 , -4.6774  , -5.0000  , -5.0000      , -5.0000     , -3.0000
--0.9755    , 0.0000         , 5.0000 , -5.0000  , -5.0000  , -5.0000      , -5.0000     , 3.0000
+0.000 ?Sine, 0.625 ?Triangle, -5 ?Saw, 0 ?SNES Noise
+0.98       , 1.25           , -4.68  , -5.00
+1.91       , 1.88           , -4.35  , -1.00
+2.78       , 2.50           , -4.03  , 3.00
+3.54       , 3.13           , -3.71  , -2.00
+4.16       , 3.75           , -3.39  , 0.00
+4.62       , 4.38           , -3.06  , -2.00
+4.90       , 5.00           , -2.74  , -4.00
+5.00       , 4.38           , -2.42  , -5.00
+4.90       , 3.75           , -2.10  , -5.00
+4.62       , 3.13           , -1.77  , 4.00
+4.16       , 2.50           , -1.45  , -1.00
+3.54       , 1.88           , -1.13  , 1.00
+2.78       , 1.25           , -0.81  , 5.00
+1.91       , 0.63           , -0.48  , 1.00
+0.98       , 0.00           , -0.16  , -1.00
+0.00       , -0.63          , 0.16   , -5.00
+-0.98      , -1.25          , 0.48   , 5.00
+-1.91      , -1.88          , 0.81   , -2.00
+-2.78      , -2.50          , 1.13   , 0.00
+-3.54      , -3.13          , 1.45   , -1.00
+-4.16      , -3.75          , 1.77   , -2.00
+-4.62      , -4.38          , 2.10   , -2.00
+-4.90      , -5.00          , 2.42   , 4.00
+-5.00      , -4.38          , 2.74   , -4.00
+-4.90      , -3.75          , 3.06   , 1.00
+-4.62      , -3.13          , 3.39   , 1.00
+-4.16      , -2.50          , 3.71   , 5.00
+-3.54      , -1.88          , 4.03   , -2.00
+-2.78      , -1.25          , 4.35   , 3.00
+-1.91      , -0.63          , 4.68   , -3.00
+-0.98      , 0.00           , 5.00   , 3.00
 ```
 
-This pattern could be clocked fast enough that it cycles through the entire sequence at audio frequencies like 440Hz, to get rudimentary audio directly from a plaintext RhythML sequence. Each column is a different wave shape (here normalized to -5/+5, for being treated as voltages in modular). Obviously this isn't as convenient as an actual wavetable synth, but it shows the flexibility of RhythML and the potential for mad science. Are there any CSV datasets you have which might do something interesting if you treat them as RhythML?
+This pattern could be clocked fast enough that it cycles through the entire sequence at audio frequencies like 440Hz, to get rudimentary audio directly from a plaintext RhythML sequence. Each column above is a different wave shapes (normalized to -5/+5, for being treated as voltages in modular). Obviously this isn't as convenient as an actual wavetable synth, but it shows the flexibility of RhythML and the potential for mad science. Are there any CSV datasets you have which might do something interesting if you treat them as RhythML? I've tried using seismic data, for example. Lots of interesting lists of numbers out there! It's also quite fun to generate sequences programmatically- little Python scripts, Excel formulas, etc.
+
+# Appendix
+
+## Acknowledgements
+
+RhythML and the Spellbook module were significantly inspired by various sources in the world of music technology and notation.
+
+A particular source of inspiration was Tantacrul's YouTube video "Notation Must Die: The Battle For How We Read Music" (https://www.youtube.com/watch?v=Eq3bUFgEcb4), which critically examines traditional music notation and proposes innovative alternatives. This video's exploration of the limitations (both real and imagined) of many different notation systems, and its call for more intuitive, flexible systems strongly influenced the development of RhythML as a modern, modular-synth-oriented approach to musical sequencing and notation. Importantly, it recognizes that there is never going to be a universal standard for music, because music is used in and important to so many radically different contexts, people, and cultures. Flexibility, interoperability and interchangeability is the name of the game here, not centralization or standardization.
+
+The design of RhythML also draws inspiration from tracker software, aiming to capture the directness and efficiency of tracker interfaces while adapting to the unique needs of modular synthesis environments like VCV Rack.
+
+## Other Notations
+
+Excellent idea. I'll expand on the introduction and add comparisons to RhythML for each system. This will help readers understand RhythML's unique position and design choices.
+
+---
+
+To understand the context and motivation behind RhythML, it's helpful to consider some other systems for representing musical information. While each of these systems has its strengths, RhythML was developed to address specific needs in the modular synthesis environment, drawing inspiration from various sources while focusing on flexibility and intuitive use in a voltage-controlled context. Here's how RhythML compares to some established systems:
+
+### Traditional Music Notation
+
+The standard system of writing music, using a five-line staff with symbols representing pitch and duration. While comprehensive and widely used, it can be complex to learn and doesn't always intuitively represent electronic or non-Western music concepts. Traditional notation primarily serves as a guide for human performers rather than as direct machine input.
+
+Comparison: Unlike traditional notation, RhythML is designed for direct machine input and is more flexible for representing non-standard tunings and electronic music concepts. However, RhythML lacks the visual intuitiveness of traditional notation for classically trained musicians. The biggest difference is the same problem piano rolls have: empty space or slow sequences would take a lot more visual space (or pages), while traditional notation compresses time for sight-reading.
+
+### ABC Notation
+
+A text-based music notation system designed for folk and traditional music. It uses the letters A through G for note names, with additional symbols for rhythm, accidentals, and other musical elements, including common ideas like repeated or looping sections. ABC Notation is compact and readable, making it popular for sharing tunes online and in folk music communities.
+
+Comparison: RhythML shares ABC Notation's text-based approach, making it easy to share and edit. However, RhythML is more focused on modular synthesis concepts and allows for direct voltage specification, which ABC Notation doesn't support.
+
+### MML (Music Macro Language)
+
+A music programming language originally developed for early computer sound chips. It uses a series of letters and numbers to represent notes, durations, and other musical parameters, and includes programmatic concepts like conditions, branches, and variables. MML is still used in some chiptune and game music contexts, offering a text-based way to create melodies and harmonies.
+
+Comparison: RhythML and MML both offer text-based music programming. However, RhythML is more tailored to modular synthesis, offering voltage-specific controls and a wider range of input formats, while MML is more focused on chip-based sound generation.
+
+### MIDI (Musical Instrument Digital Interface)
+
+A technical standard that defines a protocol, digital interface, and connectors for communication between electronic musical instruments, computers, and other audio devices. MIDI doesn't transmit audio, but rather event messages about notation, pitch, velocity, control signals, clock signals, and other types of musical information. It's widely used in music production for connecting hardware and software instruments.
+
+Comparison: While MIDI is excellent for real-time performance and recording, RhythML is designed for precise sequencing and voltage control in a modular environment. RhythML could represent MIDI-like note or CC data but also allows direct voltage specification, making it more versatile for modular synthesis applications. Because MIDI has been around so long, people have used it to control non-musical devices too, meaning you could use MIDI as the bridge between RhythML and all sorts of devices, controls, or applications.
+
+### Tracker Software
+
+A type of music sequencer software that displays note and instrument data in a grid format. Trackers originated in the 1980s and became popular in early computer music composition, especially in the demoscene. They typically represent music as numeric and letter codes in a vertical, top-to-bottom format, with each column representing a separate instrument or sound channel.
+
+Comparison: RhythML draws significant inspiration from trackers, adopting their grid-based, top-to-bottom approach to sequencing. However, RhythML is more focused on voltage control and modular synthesis concepts, offering a wider range of input formats and direct voltage specification that traditional trackers don't support. RhythML also lacks some of the more advanced playback and audio processing features found in tracker software, which are usually intended to be what we would today call a DAW.
+
+## Glossary of Terms
+
+**1v/octave standard**: A standard in analog synthesizers where a one-volt change in the control voltage corresponds to a one-octave change in pitch.
+
+**Arpeggio** / **Arpeggiator**: A musical technique where notes of a chord are played in sequence, rather than simultaneously.
+
+**Audio rate**: The rate at which audio signals are processed, typically much faster than control signals. Like the "frame rate" but for sound, and sounds need a much higher frame rate to be audible; in most digital systems, this is 44.1kHz or higher.
+
+**Cents**: A unit of measurement for musical intervals. There are 100 cents in a semitone.
+
+**Chord voicings**: Different ways of arranging the notes of a chord, often by changing their octave or order.
+
+**Clock pulses**: Regular timing signals used to synchronize different parts of a modular system or to set the tempo of a sequence.
+
+**Control Voltage (CV)**: An electrical signal used to control parameters in a modular synthesizer, such as pitch, volume, or filter cutoff.
+
+**DAW (Digital Audio Workstation)**: Software used for recording, editing, and producing audio files.
+
+**Envelope generator**: A module that creates a varying voltage over time, often used to shape the volume or timbre of a sound.
+
+**Eurorack**: A popular format for modular synthesizers, characterized by specific physical dimensions and electrical standards.
+
+**Filter cutoff**: The frequency at which a filter starts to attenuate (reduce) the signal passing through it.
+
+**Gate signals**: On/off signals in a modular system, often used to trigger events like note starts and stops.
+
+**Hertz (Hz)**: A unit of frequency, equivalent to one cycle per second.
+
+**LFO (Low-Frequency Oscillator)**: An oscillator that typically operates below the range of human hearing, used for modulation effects.
+
+**Microtonal**: Music using intervals smaller than a semitone, or pitches between the notes of a standard scale.
+
+**Modular synthesis**: A method of sound synthesis using separate modules to generate and process sound, connected in various configurations.
+
+**Oscillator**: An electronic circuit or module that produces a repeating waveform, forming the basis of many synthesized sounds.
+
+**Patch**: In modular synthesis, a specific configuration of connections between modules to create a desired sound or effect.
+
+**Phasor**: A type of oscillator that produces a rising sawtooth wave, often used for timing or modulation purposes by "syncing to its phase", as as alternative to using clocks.
+
+**Pitch bend**: A technique for smoothly changing the pitch of a note up or down from its original frequency.
+
+**Polyphonic cables**: In VCV Rack, cables that can carry multiple independent signals (up to 16) simultaneously.
+
+**Polymeters**: The simultaneous use of two or more meters (time signatures) in a piece of music.
+
+**Polyrhythms**: The simultaneous use of two or more rhythms that are not readily perceived as deriving from one another, usually by scaling two diffferent rhythmic patterns of different lengths to fit within the same total duration, creating the feeling that they "overlap".
+
+**Pulse width**: In a square wave or pulse wave, the ratio of the time the signal spends high versus low in each cycle.
+
+**Rising edge**: The transition of a signal from a low state to a high state. Often used to trigger events in modular systems; this is what most modules are actually detecting when they "detect" a trigger or gate.
+
+**Semitones**: The smallest musical interval commonly used in Western tonal music, equal to a half step.
+
+**Sequencer**: A device or software that can store a sequence of musical events (like notes or control changes) and play them back in order. Really, anything that lets you describe and use a "pattern", meaning there is a huge variety of things which could be called "sequencers".
+
+**Single-cycle waveforms**: Waveforms that complete one full cycle in a specific number of samples, used as the basis for many digital synthesis techniques.
+
+**Tracker**: A type of music sequencer software that displays note and instrument data in a grid format. Trackers originated in the 1980s and became popular in early computer music composition, especially in the demoscene. They typically represent music as numeric and letter codes in a vertical, top-to-bottom format, with each column representing a separate instrument or sound channel. This format allows for precise control over individual notes, effects, and timing, making trackers particularly suited for electronic and chiptune music styles. The compact, text-based nature of tracker formats inspired aspects of RhythML's design.
+
+**Trigger signals**: Short pulses used to initiate events in a modular system, such as starting an envelope or advancing a sequencer.
+
+**VCA (Voltage-Controlled Amplifier)**: A module that controls the amplitude (volume) of a signal based on a control voltage input.
+
+**VCO (Voltage-Controlled Oscillator)**: An oscillator whose frequency can be controlled by an input voltage.
+
+**VCV Rack**: A free, open-source software that emulates modular synthesizers on a computer.
+
+**VST (Virtual Studio Technology) plugin**: Software that integrates with audio editing and processing applications to provide additional functionality, often in the form of virtual instruments or effects.
+
+**Wavetable synth**: A type of synthesizer that uses stored tables of waveforms as its sound source, allowing for complex and evolving timbres.

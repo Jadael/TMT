@@ -4,21 +4,21 @@
 
 Spellbook is a module for VCV Rack to sequence pitch and control voltage (CV) patterns in a eurorack-style environment using the plain text [RhythML syntax](RhythML.md). It has 16 outputs, each of which outputs a voltage controlled by the corresponding column in RhythML-formatted text input.
 
-## Inputs & Outputs
+## Inputs
 
 - **Step Forward**: Advances to the next step in the sequence on the rising edge of a trigger.
 - **Step Backward**: Advances to the prior step in the sequence on the rising edge of a trigger.
 - **Reset Input**: Resets the sequence to the first step on the rising edge of the input signal.
 - **Index Input**: Set the current step to a specific index, where 0v is the first step through to 10v for the last step, like a phasor controlling a "play head".
 
-- **Index Mode Toggle**: Toggle the Index to "absolute address" mode, where 1v is step one, 2v is step two, etc.
+- **Index Mode Toggle**: Toggle the yellow glyph to switch to "absolute address" mode, where 1v is step one, 2v is step two, etc.
+
+## Outputs
 
 - **Poly Out**: Outputs all columns as channels of a polyphonic cable, for convenience.
 - **Out 1 thru Out 16**: Individual outputs for the first 16 columns specified in the RhythML sequence.
 - **Relative Index Out**: Outputs the current step as 0v = step 1, through to 10v = last step.
 - **Absolute Index Out**: Outputs the current step as a voltage, e.g. step 3 outputs 3.0v.
-
-Future expansion modules might add more outputs for more columns, because RhythML syntax allows for any number of columns.
 
 ## Guide
 
@@ -54,9 +54,9 @@ These formats are all parsed and translated into the equivalent 1v/octave contro
 
 **Gate and Trigger Commands**: These are just shorthand so you don't have to type out a bunch of numbers for things like drum sequences which don't care about pitch or the exact voltage.
 
-- `X` or `_` for a 10v output, but which guarantees a rising edge when the step begins even if the output was already at 10v, by putting a by dropping to 0v for 1ms.
-- `T` or `^` for a 1ms trigger pulse (this also guarantees a rising edge, so you'll get 0v for 1ms, then 10v for 1ms, then 0v afterward), so that the output *doesn't* stay high for the entire step. This is usually what drum or clock-related modules will prefer.
-- `W` or `|` for a full-width gate; this one has no rising edge, so there will be no gap between this step and the prior step. Identical to simply writing "10" or "100%" in the cell. The basic use case is to hold a gate open from the prior step for multi-step notes.
+- `W` or `|` for a full-width gate; this one has no rising edge, so there will be no gap between this step and the prior step. This is identical to simply writing "10" or "100%" in the cell. The basic use case is to hold a gate open from the prior step for multi-step gates.
+- `T` or `^` for a 1ms trigger pulse (this also guarantees a rising edge, so you'll get 0v for 1ms, then 10v for 1ms, then 0v until the next step), so that the output *doesn't* stay high for the entire step. This is usually what drum or clock-related modules will prefer.
+- `X` or `_` for a 10v output which guarantees a rising edge when the step begins even if the output was already at 10v, by dropping to 0v for the first 1ms.
 
 **Comments**: A `?` in a cell will begin a "comment"; it and all text for the rest of that cell will be ignored and highlighted in a different color. You can use these for labels, in-line comments and notes, or anything else where seeing a little text might be helpful.
 
@@ -64,7 +64,7 @@ These formats are all parsed and translated into the equivalent 1v/octave contro
 
 - If there are comments in the first row, Spellbook assumes they are columns labels, and they will be shown in the tooltips for the output jacks.
 
-Refer to [RhythML](RhythML.md) for comprehensive guidelines on the syntax. Check out the manufacturer presets in the module's right click menu for examples and templates of various types of sequences, including some mad science like using Spellbook as a wavetable.
+Refer to [RhythML](RhythML.md) for comprehensive guidelines on the syntax. Check out the manufacturer presets in the module's right click menu for examples and templates of various types of sequences, including some mad science like using Spellbook as a wavetable. If you think of any other number/voltage/pitch formats for which there's a good (mathematical) way to translate them into 1v/oct, let me know and we can add it to RhythML!
 
 ### Timing with Spellbook
 
@@ -83,11 +83,11 @@ It's often useful to have one Spellbook for each musical part in your patch, so 
 - The Index input is in Relative mode by default, where it acts like a phasor input: If you send a smooth rising sawtooth control voltage, Spellbook will set the "currently active step" as the *first* step when the Index voltage is 0v, and the *last* step when the Index is 10v, and the proportional step for every voltage in between. If you sync two Spellbooks with different length sequences to the same Phasor for their Index, this is a great way to get easy polyrhythms or polymeters.
 - Click the small gold symbol to change Index to Absolute mode. In this mode, Spellbook expects an Index voltage representing exactly which step to be on like an address: 1v sets Spellbook to step one, 2v is step two, 14v is step fourteen, and so on. If you send a higher voltage than you have number of rows, it will wrap around (for the nerds: modulo sequence length). Unlike Relative mode, even if the length of the sequence changes, the same index voltage always takes you to the same row.
 
-## Controls and Hotkeys
+### Controls and Hotkeys
 
 The Spellbook module offers a variety of hotkeys and controls for managing its interface and functionality effectively. Here is a comprehensive list of controls and hotkeys available for the Spellbook module:
 
-### Text Field Behavior:
+#### Text Field Behavior:
 
 - Click anywhere inside the text box on Spellbook's panel to enter "editing mode". You'll see a text cursor when focused. The prior sequence will continue playing "in the background", unchanged as you edit, until you "commit" your changes.
 - Edit your sequence, making sure to follow the syntax rules for RhythML.
@@ -96,7 +96,7 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 - The parser evaluates each cell to convert it into an appropriate output voltage. Errors default to 0 volts.
 - It tries to stay on the same "current step" if it can, but will modulo the current step into the new sequence length if the new sequence is shorter, which should hopefully help live-editing stay in sync without relying on frequent Resets, if you're careful.
   
-### Special Keyboard Shortcuts:
+#### Special Keyboard Shortcuts:
 
 - `Ctrl`+`Enter`: Commit and parse the current text, but stay in editing mode.
 - `Ctrl`+`[` or `Ctrl`+`]`: Decreases or increases the text size.
@@ -109,27 +109,33 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 - **Autoscroll:** When not in editing mode, the text field autoscrolls to keep the currently "playing" step centered, so you can see what the sequence is doing as it plays.
 - **Scrolling**: While in editing mode, you can scroll up and down using the mouse wheel, or in any direction by moving the text cursor until it touches the edge of the viewport.
 
-#### Basics of VCV Rack
+# Appendix
 
-VCV Rack is virtual modular synthesizer platform for Windows/Mac/Linux that simulates Eurorack modules, in addition to original modules that go beyond hardware. You place modules on a grid, interact with their knobs, sliders, and buttons with your mouse, and connect their input and output jacks with virtual cables to create synth patch just like a physical eurorack.
+## Basics of VCV Rack
+
+VCV Rack is virtual modular synthesizer platform for Windows/Mac/Linux that simulates Eurorack modules, in addition to original modules that go beyond hardware. You place modules on a grid, interact with their knobs, sliders, and buttons with your mouse, and connect their input and output jacks with virtual cables to create synth patches just like a physical eurorack.
 
 Spellbook is a module for VCV Rack, and RhythML was designed with VCV Rack, and modular synthesis in general, in mind.
 
-All signals in VCV Rack are virtual voltages, but they can classified roughly into a few categories:
+All signals in VCV Rack are virtual voltages (really just "a number", a fact which many modules in T's Musical Tools play with), but they can roughly classified into:
 
 - Audio signals are audible if played through your speakers. They contain audio-rate frequencies typically between 20Hz to 20kHz.
-CV (control voltage) signals can modulate parameters of other modules. For example, an LFO (low-frequency oscillator) can oscillate the pitch of a VCO (voltage-controlled oscillator) or the volume level of a VCA (voltage-controlled amplifier).
+- CV (control voltage) signals can modulate parameters of other modules. For example, an LFO (low-frequency oscillator) can oscillate the pitch of a VCO (voltage-controlled oscillator) or the volume level of a VCA (voltage-controlled amplifier).
 - 1v/oct (1 volt per octave) signals are CV signals that represent a pitch or note. In this standard, an increase of 1V increases the pitch by 1 octave. Since there are 12 semitones in an octave, an increase of 1/12v increases the pitch by 1 semitone.
-- Gate signals are treated like an on/off signal. 0v represents "off", and a positive voltage (typically 10v, but some modules define ">5v" or ">1v") represents "on". For example, the core MIDI module outputs a pitch signal and gate signal when a key is pressed, which can be sent to the pitch CV of an oscillator, and the trigger of an evelope generator, respectively.
-- Trigger signals are very short gates (usually around 1 millisecond), typically used for cases where the "length" of the gate is meaningless, like a drum trigger, or a clock pulse.
-- Clock pulses are triggers played at a steady tempo, in order to set the musical timing of your patch. Anything that sends a steady pulse can become a clock, such as an square wave LFO.
+- Gate signals are treated like an on/off signal. A "low" signal represents "off", and a "high" voltage represents "on".
+  - Typically you would send 0v for low, and 5v-10v for high. The standard in VCV Rack is to accept 1v or more as "high", and send 10v by default, which lets you route gates directly into a VCA and treat that VCA as a Voltage Controlled Gate (for example).
+  - For example, the core MIDI module outputs a separate pitch signal and gate signal when a key is pressed, which could be sent to the pitch CV of an oscillator, and the trigger/gate of an envelope generator, respectively.
+- Trigger signals are very short gates (usually around 1 millisecond), typically used for cases where the "length" of the gate is unimportant, like a drum trigger, or a clock pulse, though many modules freely accept either gates or triggers in many use cases no problem.
+- Clock pulses are gates or triggers played at a steady tempo, in order to set musical timing. Anything that sends a steady pulse can become a clock, such as an square wave LFO, or you could use a dedicated clock module with features such as creating multiple related clocks or aligning to traditional time signatures.
+- Other: Some patches might intentionally "misuse" signals, or define their own specific uses within parts of the patch, etc.
 
 Signals can be connected from module to module via patch cables. It doesn’t matter what type of signal a cable carries—you can connect any output to any input.
 
-##### Polyphonic Cables
+## Polyphonic Cables
 
-In VCV Rack, "polyphonic cables" refers to the ability of a single cable to carry multiple voltages simultaneously. This might be multiple pitches, in the traditional sense of "polyphony", but reall it's just ANY set of multiple voltages in one cable. This is a powerful feature that allows for complex patches with fewer visible connections.
+In VCV Rack, "polyphonic cables" refers to the ability of a single cable to carry multiple voltages simultaneously. This could be multiple pitches, in the traditional sense of "polyphony", but really it can be ANY set of voltages in one cable. This is a powerful feature that allows for complex patches with fewer visible connections.
 
 - A polyphonic cable in VCV Rack can carry up to 16 separate channels of voltage.
 - Polyphonic cables appear thicker than monophonic cables in the interface.
 - Each channel in a polyphonic cable is its own independent voltage, like a regular (monophonic) cable, and modules might process them in parallel, in sequence, or use them in other ways.
+  - If sent to a monophonic module, they usually read only the first channel, but polyphonic modules can do all sorts of things with the extra channels.
