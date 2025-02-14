@@ -141,7 +141,7 @@ Sequences are typically played step by step (e.g. using an clock or other trigge
 
 Importantly, RhythML itself has no concept of "time" or "duration", only "steps in a sequence". It's up to you to decide how to clock or otherwise move through a sequence to actually "play" it, and what each "step" means in the context of the music- is it going to be clocked on 8th notes? Whole notes? Bars? None of the above because you're doing some modular mad science?
 
-It's often useful to have one sequence for each musical "layer of absraction", so they can be sequenced and timed independantly based on the overall need of the music or the patch, and kept in sync using traditional timing methods such as a master clock and clock dividers. RhythML makes working with multiple clock speeds easy because RhythML sequences can be any arbitrary length; just add or remove rows.
+It's often useful to have one sequence for each musical "layer of abstraction", so they can be sequenced and timed independantly based on the overall need of the music or the patch, and kept in sync using traditional timing methods such as a master clock and clock dividers. RhythML makes working with multiple clock speeds easy because RhythML sequences can be any arbitrary length; just add or remove rows.
 
 You might step one sequence once per bar, for the chord progression, then you might clock a drum loop in another sequence on 16th notes.
 
@@ -232,7 +232,7 @@ This you could clock at the start of each bar or phrase, showing how "steps" don
 #### Basic Rock Drums:
 
 ```
-T?Kick, ?Snare, ?Tom1, ?Tom2, ?Rim, ?Clap, T?cHat, ?oHat, ?Crash, ?Ride
+T ?Kick, ?Snare, ?Tom1, ?Tom2, ?Rim, ?Clap, T ?cHat, ?oHat, ?Crash, ?Ride
       ,       ,      ,      ,     ,      ,       ,      ,       , 
       ,       ,      ,      ,     ,      , T     ,      ,       , 
       ,       ,      ,      ,     ,      ,       ,      ,       , 
@@ -302,10 +302,6 @@ A particular source of inspiration was Tantacrul's YouTube video "Notation Must 
 The design of RhythML also draws inspiration from tracker software, aiming to capture the directness and efficiency of tracker interfaces while adapting to the unique needs of modular synthesis environments like VCV Rack.
 
 ## Other Notations
-
-Excellent idea. I'll expand on the introduction and add comparisons to RhythML for each system. This will help readers understand RhythML's unique position and design choices.
-
----
 
 To understand the context and motivation behind RhythML, it's helpful to consider some other systems for representing musical information. While each of these systems has its strengths, RhythML was developed to address specific needs in the modular synthesis environment, drawing inspiration from various sources while focusing on flexibility and intuitive use in a voltage-controlled context. Here's how RhythML compares to some established systems:
 
