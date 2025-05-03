@@ -4,7 +4,9 @@ RhythML is a plaintext format designed to sequence pitch and CV patterns in a eu
 
 Right now, RhythML is only implemented in one place: the ['Spellbook' module for VCV Rack](https://github.com/Jadael/TMT). However, the format is meant to be platform/technology agnostic. In the future, we would love to create or see others create plugins and standalone tools to convert RhythML to and from other common musical notations, or use it in common apps and music writing tools.
 
-Below is a detailed specification of the RhythML syntax, mostly as implemented by the `Spellbook` VCV Rack module. Within the context of Spellbook as a VCV Rack module, pitches and percentages are translated into 1v/octave. In other contexts, RhythML would be translated into appropriate signals for that system. For example, if there were a RhythML module as a VST plugin for your DAW, it would most likely output everything as MIDI, with output ranges of 0-127 instead of voltages.
+Watch an introduction: [Spellbook & RhythML](https://www.youtube.com/watch?v=c-NcPl_jUOc)
+
+Below is a detailed specification of the RhythML syntax, mostly as implemented by the `Spellbook` VCV Rack module. Within the context of Spellbook as a VCV Rack module, pitches and percentages are translated into 1v/octave. In other contexts, RhythML would be translated into appropriate signals for that system. For example, if there were a RhythML module as a VST plugin, it would most likely output MIDI CC with a range of 0-127, instead of voltages from 0 to 10.
 
 ### Basic Structure
 
@@ -190,10 +192,6 @@ B4        , X            , 5
 Notice the way this pattern holds the first note for multiple steps by using `|` gates.
 
 In general, don't forget that in modular contexts you need to explicitly and separately output every different voltage/signal you need, like gates, velocities, CVs; everything!
-
-Watch a brief demonstration here:
-
-[![YouTube Demo](https://img.youtube.com/vi/vhQHPlpJW-Q/0.jpg)](https://www.youtube.com/watch?v=vhQHPlpJW-Q)
 
 ### Other Examples
 
