@@ -31,6 +31,7 @@ void init(Plugin* p) {
 	p->addModel(modelAppend);
 	p->addModel(modelSight);
 	p->addModel(modelSpellbook);
+	p->addModel(modelPage);
 	p->addModel(modelStats);
 	p->addModel(modelBlankt);
 	p->addModel(modelSort);
