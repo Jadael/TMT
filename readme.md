@@ -29,6 +29,7 @@ The modules might look a little intimidating, because there no knobs in these mo
 - [Append](#append) - Combine the channels of up to 16 mono or polyphonic cables (i.e. append the multiple lists together into one big list; up to a total internal buffer of 256 channels), then output a 1 to 16 channel subset of them, with CV controls for width and starting point.
  - [Spine](#spine) - A few useful, static, CV operations for offsets, inverse, and reverse.
 - [Spellbook](#spellbook) - Plain text "musical markup" sequencing of CVs/pitches, with a broad variety of accepted formats for however you want to write your sequences; such as pitch names, MIDI note numbers, semitones, Hertz, etc. Write out sequences in rows and columns like a spreadsheet!
+- [Page](#page) - Expander for Spellbook that outputs columns 17-32. Chain up to 31 Pages for 512 columns total.
 
 ## Getting Started
 
@@ -635,6 +636,41 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 - **Resizing:** You can resize the module by dragging the right edge of the panel, to handle different numbers of columns in your sequences. I place minimized Spellbooks with one-column sequences all over my patches for short simple loops all the time.
 - **Autoscroll:** When not in editing mode, the text field autoscrolls to keep the currently "playing" step centered, so you can see what the sequence is doing as it plays.
 - **Scrolling**: While in editing mode, you can scroll up and down using the mouse wheel, or in any direction by moving the text cursor until it touches the edge of the viewport.
+
+---
+
+# Page
+
+![Page](screenshots/page.png)
+
+Page is an expander module for Spellbook that provides 16 additional outputs for columns 17-32 of a RhythML sequence. Multiple Page modules can be chained together to support up to 512 total columns (Spellbook's 16 base columns + 31 Pages × 16 columns each).
+
+- 16 individual outputs (columns 17-32, or 33-48, etc. depending on position in chain)
+- Polyphonic output with active channels based on sequence content
+- Automatic position detection when placed adjacent to Spellbook or another Page
+- Supports chaining up to 31 Pages for 512 columns total
+
+## Usage
+
+1. Place a Page module directly to the right of a Spellbook module (or another Page module to extend further)
+2. The module automatically detects its position in the chain and outputs the appropriate columns
+3. Page receives pre-calculated voltages from Spellbook, so all timing, triggers, gates, and CV calculations happen in the base module
+
+## Outputs
+
+- **Poly Out**: Polyphonic output containing voltages for this Page's 16 columns (number of active channels matches the sequence)
+- **Out 1-16**: Individual outputs for each column this Page handles
+  - First Page (position 1): Outputs columns 17-32
+  - Second Page (position 2): Outputs columns 33-48
+  - And so on...
+
+## Guide
+
+Page makes it easy to create sequences with more than 16 columns in Spellbook:
+
+1. **Basic Usage**: Create a RhythML sequence with more than 16 columns in Spellbook. Place a Page module to the right of Spellbook to access columns 17-32.
+
+2. **Chaining**: Add more Page modules to the right for even more columns. Each Page automatically detects its position and outputs the correct columns.
 
 ---
 
