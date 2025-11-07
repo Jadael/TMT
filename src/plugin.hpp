@@ -32,6 +32,7 @@ extern Model* modelOuroboros;
 extern Model* modelAppend;
 extern Model* modelSight;
 extern Model* modelSpellbook;
+extern Model* modelPage;
 extern Model* modelStats;
 extern Model* modelBlankt;
 extern Model* modelSort;

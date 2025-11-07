@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "plugin.hpp"
 #include "ports.hpp"
+#include "spellbook_expander.hpp"
 #include <sstream>
 #include <vector>
 #include <map>
@@ -127,8 +128,11 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     bool dirty = false;
     bool fullyInitialized = false;
   float lineHeight = 12;
-    
-  Spellbook() : lastValues(16, {0.0f, 'N'}) {  // Some RhythML commands act differently based on the prior voltage of each channel, so assume all 0s for "before time began"
+
+    // Expander message buffers (static allocation to avoid DLL issues)
+    SpellbookExpanderMessage rightMessages[2];
+
+  Spellbook() : lastValues(MAX_EXPANDER_COLUMNS, {0.0f, 'N'}) {  // Support up to 128 columns for expanders
     config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
     configInput(STEPFWD_INPUT, "Step Forward");
     configInput(STEPBAK_INPUT, "Step Backward");
@@ -148,6 +152,23 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     outputs[POLY_OUTPUT].setChannels(16);
       // TODO: The compiler keeps complaining about array bounds, because we're basically just pinky-promising ourselves to never change the number of channels and a lot of places just ASSUME 16 channels. Need to change something about how we distribute all the right values to all the right channels to avoid that awkwardness.
         width = SPELLBOOK_DEFAULT_WIDTH; // Not sure this is needed, I just feel safer with it here.
+
+    // Initialize expander messages
+    rightExpander.producerMessage = &rightMessages[0];
+    rightExpander.consumerMessage = &rightMessages[1];
+
+    // Initialize message data to valid defaults
+    for (int i = 0; i < 2; i++) {
+      rightMessages[i].baseID = -1;
+      rightMessages[i].position = 1;
+      rightMessages[i].currentStep = 0;
+      rightMessages[i].totalSteps = 0;
+      rightMessages[i].totalColumns = 0;
+      for (int j = 0; j < MAX_EXPANDER_COLUMNS; j++) {
+        rightMessages[i].outputVoltages[j] = 0.0f;
+      }
+    }
+
     fullyInitialized = true;
     }
   
@@ -172,9 +193,9 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
       }
     }
     configOutput(POLY_OUTPUT, polyOutputLabel);
-    
-    // Mono labels
-    for (size_t i = 0; i < labels.size(); ++i) {
+
+    // Mono labels - only configure up to 16 outputs to prevent crash with 17+ columns
+    for (size_t i = 0; i < std::min(labels.size(), (size_t)16); ++i) {
       configOutput(OUT01_OUTPUT + i, labels[i]);
     }
   }
@@ -410,11 +431,11 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     std::istringstream ss(text);
     std::string line;
     while (getline(ss, line)) {
-      std::vector<StepData> stepData(16, StepData{0.0f, 'U'});  // Default all steps to 0.0 volts, "Unused" type
+      std::vector<StepData> stepData(MAX_EXPANDER_COLUMNS, StepData{0.0f, 'U'});  // Support up to 128 columns
       std::istringstream lineStream(line);
       std::string cell;
       int index = 0;
-      while (getline(lineStream, cell, ',') && index < 16) {
+      while (getline(lineStream, cell, ',') && index < MAX_EXPANDER_COLUMNS) {
         size_t commentPos = cell.find('?');
         if (commentPos != std::string::npos) {
           cell = cell.substr(0, commentPos);  // Remove the comment part
@@ -445,11 +466,27 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
           
         index++;
       }
+
+      // Trim unused columns - find the last non-unused column
+      int lastUsedColumn = 0;
+      for (int i = 0; i < (int)stepData.size(); i++) {
+        if (stepData[i].type != 'U') {
+          lastUsedColumn = i + 1;
+        }
+      }
+
+      // Resize to only include used columns (or minimum 1)
+      if (lastUsedColumn > 0) {
+        stepData.resize(lastUsedColumn);
+      } else {
+        stepData.resize(1);  // At least one column
+      }
+
       steps.push_back(stepData);
     }
 
     if (steps.empty()) {
-      steps.push_back(std::vector<StepData>(16, StepData{0.0f, 'U'}));
+      steps.push_back(std::vector<StepData>(1, StepData{0.0f, 'U'}));
     }
 
     currentStep = currentStep % steps.size();
@@ -622,6 +659,84 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
       }
       
       dirty = true;  // Mark for re-parsing
+    }
+
+    // Send pre-calculated voltages to right expander (Page modules)
+    if (rightExpander.module && rightExpander.module->leftExpander.consumerMessage) {
+      SpellbookExpanderMessage* message = (SpellbookExpanderMessage*)rightExpander.module->leftExpander.consumerMessage;
+
+      message->baseID = id;
+      message->position = 1;  // First expander is position 1
+      message->currentStep = currentStep;
+      message->totalSteps = steps.size();
+
+      // Get the total number of columns from current step
+      int totalColumns = 0;
+      if (currentStep < (int)steps.size()) {
+        totalColumns = steps[currentStep].size();
+      }
+      message->totalColumns = totalColumns;
+
+      // Calculate output voltages for ALL columns (up to MAX_EXPANDER_COLUMNS)
+      // This includes columns 1-16 (handled by Spellbook) and 17+ (handled by Page expanders)
+      for (int i = 0; i < MAX_EXPANDER_COLUMNS; i++) {
+        float outputValue = 0.0f;
+
+        if (currentStep < (int)steps.size() && i < (int)steps[currentStep].size()) {
+          StepData& step = steps[currentStep][i];
+
+          // Use the same logic as the main output loop above
+          switch (step.type) {
+            case 'T':  // Trigger
+              if (triggerTimer.check(0.002f)) {
+                outputValue = 0.0f;
+              } else if (triggerTimer.check(0.001f)) {
+                outputValue = 10.0f;
+              } else {
+                outputValue = 0.0f;
+              }
+              break;
+            case 'R':  // Retrigger
+              if (!triggerTimer.check(0.001f)) {
+                outputValue = 0.0f;
+              } else {
+                outputValue = 10.0f;
+              }
+              break;
+            case 'G':  // Full-width gate
+              outputValue = 10.0f;
+              break;
+            case 'N':  // Normal pitch or CV
+              outputValue = step.voltage;
+              break;
+            case 'E':  // Empty cells
+              if (i < (int)lastValues.size()) {
+                if (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R') {
+                  outputValue = 0.0f;
+                } else {
+                  outputValue = lastValues[i].voltage;
+                }
+              }
+              break;
+            case 'U':  // Unused cells
+              outputValue = 0.0f;
+              break;
+            default:
+              outputValue = step.voltage;
+              break;
+          }
+
+          // Update lastValues for this column
+          if (i < (int)lastValues.size()) {
+            lastValues[i].voltage = outputValue;
+            lastValues[i].type = step.type;
+          }
+        }
+
+        message->outputVoltages[i] = outputValue;
+      }
+
+      rightExpander.module->leftExpander.messageFlipRequested = true;
     }
   }
 
