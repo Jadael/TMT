@@ -90,6 +90,14 @@ struct Spellbook : Module {
         LIGHTS_LEN
     };
 
+    // Polyphony output mode - determines how many channels are output
+    enum PolyphonyMode {
+        POLY_WIDEST_ROW,      // Output channels = widest row in sequence (current behavior)
+        POLY_NON_BLANK,       // Output only non-blank cells in each row
+        POLY_UP_TO_LAST       // Output columns up to and including last non-blank cell
+    };
+    PolyphonyMode polyphonyMode = POLY_WIDEST_ROW;
+
     dsp::SchmittTrigger stepForwardTrigger;
   dsp::SchmittTrigger stepBackTrigger;
   dsp::SchmittTrigger resetTrigger;
@@ -231,6 +239,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     json_object_set_new(rootJ, "text", json_stringn(text.c_str(), text.size()));
     json_object_set_new(rootJ, "lineHeight", json_real(lineHeight));
     json_object_set_new(rootJ, "width", json_real(width));
+    json_object_set_new(rootJ, "polyphonyMode", json_integer(polyphonyMode));
     return rootJ;
   }
 
@@ -248,7 +257,12 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 
     json_t* widthJ = json_object_get(rootJ, "width");
     if (widthJ) {
-      width = clamp(json_number_value(widthJ),SPELLBOOK_MIN_WIDTH,SPELLBOOK_MAX_WIDTH); 
+      width = clamp(json_number_value(widthJ),SPELLBOOK_MIN_WIDTH,SPELLBOOK_MAX_WIDTH);
+    }
+
+    json_t* polyphonyModeJ = json_object_get(rootJ, "polyphonyMode");
+    if (polyphonyModeJ) {
+      polyphonyMode = (PolyphonyMode)clamp((int)json_integer_value(polyphonyModeJ), 0, 2);
     }
 
     dirty = true;
@@ -574,15 +588,47 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
 
     outputs[POLY_OUTPUT].setChannels(16);
     std::vector<StepData>& currentValues = steps[currentStep];
-    int activeChannels = 0;  // Variable to keep track of the last non-'U' channel
-    
-    // Determine the number of active channels
-    for (int i = 0; i < 16; i++) {
-      if (currentValues[i].type != 'U') {
-        activeChannels = i + 1;  // Last non-'U' channel index + 1
+    int activeChannels = 0;  // Variable to keep track of channel count
+
+    // Determine the number of active channels based on polyphony mode
+    switch (polyphonyMode) {
+      case POLY_WIDEST_ROW: {
+        // Find the widest row in the entire sequence
+        for (size_t row = 0; row < steps.size(); row++) {
+          int rowWidth = 0;
+          for (int i = 0; i < 16 && i < (int)steps[row].size(); i++) {
+            if (steps[row][i].type != 'U') {
+              rowWidth = i + 1;
+            }
+          }
+          activeChannels = std::max(activeChannels, rowWidth);
+        }
+        break;
+      }
+      case POLY_NON_BLANK: {
+        // Count only non-blank (non-E, non-U) cells in current row
+        // For a row like "10, 10, , 10" this outputs 3 channels
+        for (int i = 0; i < 16 && i < (int)currentValues.size(); i++) {
+          if (currentValues[i].type != 'U' && currentValues[i].type != 'E') {
+            activeChannels++;
+          }
+        }
+        break;
+      }
+      case POLY_UP_TO_LAST:
+      default: {
+        // Output columns up to and including last non-blank cell
+        // For a row like "10, 10, , 10" this outputs 4 channels
+        for (int i = 0; i < 16 && i < (int)currentValues.size(); i++) {
+          if (currentValues[i].type != 'U') {
+            activeChannels = i + 1;
+          }
+        }
+        break;
       }
     }
 
+    int polyChannel = 0;  // Track which poly channel to output to (for POLY_NON_BLANK packing)
     for (int i = 0; i < 16; i++) { // Use PORT_MAX_CHANNELS instead of 16?
       StepData& step = currentValues[i];
       float outputValue = lastValues[i].voltage;  // Default  to last known voltage
@@ -622,12 +668,22 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
           break;
       }
       outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
-      outputs[POLY_OUTPUT].setVoltage(outputValue, i); // I suppose we could skip unused columns to improve this
-      // Set the number of channels on the poly output to the number of active channels
-      outputs[POLY_OUTPUT].setChannels(activeChannels);
+
+      // For POLY_NON_BLANK mode, pack non-blank values into consecutive channels
+      if (polyphonyMode == POLY_NON_BLANK) {
+        if (step.type != 'U' && step.type != 'E') {
+          outputs[POLY_OUTPUT].setVoltage(outputValue, polyChannel);
+          polyChannel++;
+        }
+      } else {
+        outputs[POLY_OUTPUT].setVoltage(outputValue, i);
+      }
+
       lastValues[i].voltage = outputValue;
       lastValues[i].type = step.type;
     }
+    // Set the number of channels on the poly output to the number of active channels
+    outputs[POLY_OUTPUT].setChannels(activeChannels);
     // Handle recording
     if (inputs[RECORD_GATE_INPUT].isConnected() && inputs[RECORD_IN_INPUT].isConnected()) {
       int gateChannels = inputs[RECORD_GATE_INPUT].getChannels();
@@ -1676,6 +1732,29 @@ struct SpellbookWidget : ModuleWidget {
     }
     
     ModuleWidget::step();
+  }
+
+  void appendContextMenu(Menu* menu) override {
+    Spellbook* module = dynamic_cast<Spellbook*>(this->module);
+    if (!module) return;
+
+    menu->addChild(new MenuSeparator());
+    menu->addChild(createMenuLabel("Polyphony Mode"));
+
+    menu->addChild(createCheckMenuItem("Widest row (constant channels)", "",
+      [=]() { return module->polyphonyMode == Spellbook::POLY_WIDEST_ROW; },
+      [=]() { module->polyphonyMode = Spellbook::POLY_WIDEST_ROW; }
+    ));
+
+    menu->addChild(createCheckMenuItem("Non-blank cells only (variable)", "",
+      [=]() { return module->polyphonyMode == Spellbook::POLY_NON_BLANK; },
+      [=]() { module->polyphonyMode = Spellbook::POLY_NON_BLANK; }
+    ));
+
+    menu->addChild(createCheckMenuItem("Up to last non-blank (per row)", "",
+      [=]() { return module->polyphonyMode == Spellbook::POLY_UP_TO_LAST; },
+      [=]() { module->polyphonyMode = Spellbook::POLY_UP_TO_LAST; }
+    ));
   }
 };
 

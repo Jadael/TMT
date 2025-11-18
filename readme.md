@@ -637,6 +637,16 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 - **Autoscroll:** When not in editing mode, the text field autoscrolls to keep the currently "playing" step centered, so you can see what the sequence is doing as it plays.
 - **Scrolling**: While in editing mode, you can scroll up and down using the mouse wheel, or in any direction by moving the text cursor until it touches the edge of the viewport.
 
+### Polyphony Mode
+
+Right-click on Spellbook to access the context menu and select a polyphony mode. This controls how the polyphonic output determines its channel count:
+
+- **Widest row (constant channels)**: The polyphonic output always has the same number of channels, matching the widest row in the entire sequence. This is useful when you need a consistent channel count throughout playback.
+
+- **Non-blank cells only (variable)**: Each row outputs only its non-blank cells, packed into consecutive channels. For example, a row like `10, 10, , 7` would output 3 channels containing 10, 10, and 7. Empty cells are skipped entirely, and the remaining values are packed together. This is useful for variable polyphony where you want the channel count to shrink and grow based on content.
+
+- **Up to last non-blank (per row)**: Each row outputs channels up to and including the last non-blank cell. For example, `10, 10, , 7` would output 4 channels (10, 10, held-value, 7). Empty cells in the middle still occupy their channel position. This is the default behavior.
+
 ---
 
 # Page
