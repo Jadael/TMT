@@ -728,104 +728,116 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
     // Handle recording
     static std::vector<dsp::SchmittTrigger> recordTriggers(16);
     if (inputs[RECORD_TRIGGER_INPUT].isConnected() && inputs[RECORD_IN_INPUT].isConnected()) {
-      int triggerChannels = inputs[RECORD_TRIGGER_INPUT].getChannels();
-      int inChannels = inputs[RECORD_IN_INPUT].getChannels();
-      bool needsTextUpdate = false;
+      int triggerChannels = std::min(inputs[RECORD_TRIGGER_INPUT].getChannels(), 16);
+      int inChannels = std::min(inputs[RECORD_IN_INPUT].getChannels(), 16);
 
-      // Check for trigger rising edges
-      for (int i = 0; i < std::min(triggerChannels, 16); i++) {
-          if (recordTriggers[i].process(inputs[RECORD_TRIGGER_INPUT].getVoltage(i))) {
-              // Trigger rising edge detected - record the voltage
-              float recordedVoltage;
-              if (inChannels == 1) {
-                  // Monophonic input - use for all channels
-                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(0);
-              } else if (i < inChannels) {
-                  // Polyphonic input - use corresponding channel
-                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(i);
-              } else {
-                  // Channel doesn't exist in input
-                  continue;
+      // Determine which channels to record
+      std::vector<int> channelsToRecord;
+
+      if (triggerChannels == 1) {
+          // Mono trigger: check if it fires, then record ALL input channels
+          if (recordTriggers[0].process(inputs[RECORD_TRIGGER_INPUT].getVoltage(0))) {
+              for (int i = 0; i < inChannels; i++) {
+                  channelsToRecord.push_back(i);
               }
-
-              // Update the text buffer directly
-              if (currentStep < (int)steps.size()) {
-                  // Convert voltage to string based on quantize mode
-                  std::string voltageStr;
-                  if (recordQuantizeMode == RECORD_NOTE_NAME) {
-                      // Quantize to nearest note name
-                      voltageStr = voltageToNoteName(recordedVoltage);
-                  } else {
-                      // Store as decimal with 4 decimal places
-                      std::ostringstream ss;
-                      ss << std::fixed << std::setprecision(4) << recordedVoltage;
-                      voltageStr = ss.str();
-                  }
-
-                  // Parse text into lines
-                  std::istringstream textStream(text);
-                  std::string line;
-                  std::vector<std::string> lines;
-                  while (std::getline(textStream, line)) {
-                      lines.push_back(line);
-                  }
-
-                  // Make sure we have enough lines
-                  while ((int)lines.size() <= currentStep) {
-                      lines.push_back("");
-                  }
-
-                  // Split the current line into cells
-                  std::string& currentLine = lines[currentStep];
-                  std::vector<std::string> cells;
-                  std::istringstream lineStream(currentLine);
-                  std::string cell;
-                  while (std::getline(lineStream, cell, ',')) {
-                      cells.push_back(cell);
-                  }
-
-                  // Make sure we have enough cells
-                  while ((int)cells.size() <= i) {
-                      cells.push_back("");
-                  }
-
-                  // Extract any comment from the existing cell
-                  size_t commentPos = cells[i].find('?');
-                  std::string comment = "";
-                  if (commentPos != std::string::npos) {
-                      comment = cells[i].substr(commentPos);
-                  }
-
-                  // Replace the cell content with the voltage string, preserving comment
-                  cells[i] = voltageStr;
-                  if (!comment.empty()) {
-                      cells[i] += " " + comment;
-                  }
-
-                  // Rebuild the line
-                  currentLine = "";
-                  for (size_t j = 0; j < cells.size(); j++) {
-                      currentLine += cells[j];
-                      if (j < cells.size() - 1) {
-                          currentLine += ",";
-                      }
-                  }
-
-                  // Rebuild the text
-                  text = "";
-                  for (size_t j = 0; j < lines.size(); j++) {
-                      text += lines[j];
-                      if (j < lines.size() - 1) {
-                          text += "\n";
-                      }
-                  }
-
-                  needsTextUpdate = true;
+          }
+      } else {
+          // Poly trigger: only record channels where trigger fires
+          for (int i = 0; i < triggerChannels; i++) {
+              if (recordTriggers[i].process(inputs[RECORD_TRIGGER_INPUT].getVoltage(i))) {
+                  channelsToRecord.push_back(i);
               }
           }
       }
 
-      if (needsTextUpdate) {
+      // If we have channels to record, update the text buffer
+      if (!channelsToRecord.empty() && currentStep < (int)steps.size()) {
+          // Parse text into lines once
+          std::istringstream textStream(text);
+          std::string line;
+          std::vector<std::string> lines;
+          while (std::getline(textStream, line)) {
+              lines.push_back(line);
+          }
+
+          // Make sure we have enough lines
+          while ((int)lines.size() <= currentStep) {
+              lines.push_back("");
+          }
+
+          // Split the current line into cells
+          std::string& currentLine = lines[currentStep];
+          std::vector<std::string> cells;
+          std::istringstream lineStream(currentLine);
+          std::string cell;
+          while (std::getline(lineStream, cell, ',')) {
+              cells.push_back(cell);
+          }
+
+          // Record all triggered channels
+          for (int channelIdx : channelsToRecord) {
+              // Get the voltage to record
+              float recordedVoltage;
+              if (inChannels == 1) {
+                  // Mono input: use for all channels
+                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(0);
+              } else if (channelIdx < inChannels) {
+                  // Poly input: use corresponding channel
+                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(channelIdx);
+              } else {
+                  // Channel index exceeds input channels, skip
+                  continue;
+              }
+
+              // Convert voltage to string based on quantize mode
+              std::string voltageStr;
+              if (recordQuantizeMode == RECORD_NOTE_NAME) {
+                  // Quantize to nearest note name
+                  voltageStr = voltageToNoteName(recordedVoltage);
+              } else {
+                  // Store as decimal with 4 decimal places
+                  std::ostringstream ss;
+                  ss << std::fixed << std::setprecision(4) << recordedVoltage;
+                  voltageStr = ss.str();
+              }
+
+              // Make sure we have enough cells
+              while ((int)cells.size() <= channelIdx) {
+                  cells.push_back("");
+              }
+
+              // Extract any comment from the existing cell
+              size_t commentPos = cells[channelIdx].find('?');
+              std::string comment = "";
+              if (commentPos != std::string::npos) {
+                  comment = cells[channelIdx].substr(commentPos);
+              }
+
+              // Replace the cell content with the voltage string, preserving comment
+              cells[channelIdx] = voltageStr;
+              if (!comment.empty()) {
+                  cells[channelIdx] += " " + comment;
+              }
+          }
+
+          // Rebuild the line
+          currentLine = "";
+          for (size_t j = 0; j < cells.size(); j++) {
+              currentLine += cells[j];
+              if (j < cells.size() - 1) {
+                  currentLine += ",";
+              }
+          }
+
+          // Rebuild the text
+          text = "";
+          for (size_t j = 0; j < lines.size(); j++) {
+              text += lines[j];
+              if (j < lines.size() - 1) {
+                  text += "\n";
+              }
+          }
+
           dirty = true;  // Mark for re-parsing
       }
     }
