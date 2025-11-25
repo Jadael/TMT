@@ -685,36 +685,101 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
     // Set the number of channels on the poly output to the number of active channels
     outputs[POLY_OUTPUT].setChannels(activeChannels);
     // Handle recording
+    static std::vector<dsp::SchmittTrigger> recordGateTriggers(16);
     if (inputs[RECORD_GATE_INPUT].isConnected() && inputs[RECORD_IN_INPUT].isConnected()) {
       int gateChannels = inputs[RECORD_GATE_INPUT].getChannels();
       int inChannels = inputs[RECORD_IN_INPUT].getChannels();
-      
+      bool needsTextUpdate = false;
+
+      // Check for gate triggers
       for (int i = 0; i < std::min(gateChannels, 16); i++) {
-          if (inputs[RECORD_GATE_INPUT].getVoltage(i) >= 10.0f) {
-              if (i < inChannels) {
-                  float recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(i);
-                  if (currentStep < (int)steps.size() && i < (int)steps[currentStep].size()) {
-                      steps[currentStep][i].voltage = recordedVoltage;
-                      steps[currentStep][i].type = 'N';  // Set as Normal type
+          if (recordGateTriggers[i].process(inputs[RECORD_GATE_INPUT].getVoltage(i))) {
+              // Gate just went high - record the voltage
+              float recordedVoltage;
+              if (inChannels == 1) {
+                  // Monophonic input - use for all channels
+                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(0);
+              } else if (i < inChannels) {
+                  // Polyphonic input - use corresponding channel
+                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(i);
+              } else {
+                  // Channel doesn't exist in input
+                  continue;
+              }
+
+              // Update the text buffer directly
+              if (currentStep < (int)steps.size()) {
+                  // Convert voltage to decimal string with 4 decimal places
+                  std::ostringstream ss;
+                  ss << std::fixed << std::setprecision(4) << recordedVoltage;
+                  std::string voltageStr = ss.str();
+
+                  // Parse text into lines
+                  std::istringstream textStream(text);
+                  std::string line;
+                  std::vector<std::string> lines;
+                  while (std::getline(textStream, line)) {
+                      lines.push_back(line);
                   }
+
+                  // Make sure we have enough lines
+                  while ((int)lines.size() <= currentStep) {
+                      lines.push_back("");
+                  }
+
+                  // Split the current line into cells
+                  std::string& currentLine = lines[currentStep];
+                  std::vector<std::string> cells;
+                  std::istringstream lineStream(currentLine);
+                  std::string cell;
+                  while (std::getline(lineStream, cell, ',')) {
+                      cells.push_back(cell);
+                  }
+
+                  // Make sure we have enough cells
+                  while ((int)cells.size() <= i) {
+                      cells.push_back("");
+                  }
+
+                  // Extract any comment from the existing cell
+                  size_t commentPos = cells[i].find('?');
+                  std::string comment = "";
+                  if (commentPos != std::string::npos) {
+                      comment = cells[i].substr(commentPos);
+                  }
+
+                  // Replace the cell content with the voltage string, preserving comment
+                  cells[i] = voltageStr;
+                  if (!comment.empty()) {
+                      cells[i] += " " + comment;
+                  }
+
+                  // Rebuild the line
+                  currentLine = "";
+                  for (size_t j = 0; j < cells.size(); j++) {
+                      currentLine += cells[j];
+                      if (j < cells.size() - 1) {
+                          currentLine += ",";
+                      }
+                  }
+
+                  // Rebuild the text
+                  text = "";
+                  for (size_t j = 0; j < lines.size(); j++) {
+                      text += lines[j];
+                      if (j < lines.size() - 1) {
+                          text += "\n";
+                      }
+                  }
+
+                  needsTextUpdate = true;
               }
           }
       }
-      
-      // If Record In is monophonic, use it for all high gates
-      if (inChannels == 1) {
-          float monoVoltage = inputs[RECORD_IN_INPUT].getVoltage(0);
-          for (int i = 0; i < std::min(gateChannels, 16); i++) {
-              if (inputs[RECORD_GATE_INPUT].getVoltage(i) >= 10.0f) {
-                  if (currentStep < (int)steps.size() && i < (int)steps[currentStep].size()) {
-                      steps[currentStep][i].voltage = monoVoltage;
-                      steps[currentStep][i].type = 'N';  // Set as Normal type
-                  }
-              }
-          }
+
+      if (needsTextUpdate) {
+          dirty = true;  // Mark for re-parsing
       }
-      
-      dirty = true;  // Mark for re-parsing
     }
 
     // Send pre-calculated voltages to right expander (Page modules)
