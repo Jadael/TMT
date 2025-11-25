@@ -73,8 +73,8 @@ struct Spellbook : Module {
         RESET_INPUT,
     INDEX_INPUT,
     STEPBAK_INPUT,
-    RECORD_IN_INPUT,   // New input for recording voltages
-    RECORD_GATE_INPUT, // New input for record gate
+    RECORD_IN_INPUT,      // Input for recording voltages
+    RECORD_TRIGGER_INPUT, // Trigger input for recording
         INPUTS_LEN
     };
     enum OutputId {
@@ -97,6 +97,13 @@ struct Spellbook : Module {
         POLY_UP_TO_LAST       // Output columns up to and including last non-blank cell
     };
     PolyphonyMode polyphonyMode = POLY_WIDEST_ROW;
+
+    // Recording quantize mode - determines how recorded voltages are stored
+    enum RecordQuantizeMode {
+        RECORD_DECIMAL,       // Store as decimal voltage (e.g., "0.5833")
+        RECORD_NOTE_NAME      // Quantize to nearest note name (e.g., "G#4")
+    };
+    RecordQuantizeMode recordQuantizeMode = RECORD_DECIMAL;
 
     dsp::SchmittTrigger stepForwardTrigger;
   dsp::SchmittTrigger stepBackTrigger;
@@ -146,8 +153,8 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     configInput(STEPBAK_INPUT, "Step Backward");
     configInput(RESET_INPUT, "Reset");
     configInput(INDEX_INPUT, "Index");
-    configInput(RECORD_IN_INPUT, "Record In");
-    configInput(RECORD_GATE_INPUT, "Record Gate");
+    configInput(RECORD_IN_INPUT, "Record In - Voltages to record into current row (polyphonic)");
+    configInput(RECORD_TRIGGER_INPUT, "Record Trigger - Rising edge triggers recording of voltages into current row (polyphonic)");
     configOutput(POLY_OUTPUT, "Polyphonic voltages from columns");
     configParam(TOGGLE_SWITCH, 0.f, 1.f, 0.f, "Toggle Relative or Absolute indexing");
     configOutput(RELATIVE_OUTPUT, "Relative Index");
@@ -240,6 +247,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     json_object_set_new(rootJ, "lineHeight", json_real(lineHeight));
     json_object_set_new(rootJ, "width", json_real(width));
     json_object_set_new(rootJ, "polyphonyMode", json_integer(polyphonyMode));
+    json_object_set_new(rootJ, "recordQuantizeMode", json_integer(recordQuantizeMode));
     return rootJ;
   }
 
@@ -263,6 +271,11 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     json_t* polyphonyModeJ = json_object_get(rootJ, "polyphonyMode");
     if (polyphonyModeJ) {
       polyphonyMode = (PolyphonyMode)clamp((int)json_integer_value(polyphonyModeJ), 0, 2);
+    }
+
+    json_t* recordQuantizeModeJ = json_object_get(rootJ, "recordQuantizeMode");
+    if (recordQuantizeModeJ) {
+      recordQuantizeMode = (RecordQuantizeMode)clamp((int)json_integer_value(recordQuantizeModeJ), 0, 1);
     }
 
     dirty = true;
@@ -343,6 +356,34 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     } catch (...) {
       return 0.0f;  // Return default voltage if parsing fails
     }
+  }
+
+  // Convert voltage to note name (inverse of noteNameToVoltage)
+  std::string voltageToNoteName(float voltage) {
+    // Convert voltage to semitones from C4
+    float semitones = voltage * 12.0f;
+
+    // Round to nearest semitone for quantization
+    int roundedSemitones = (int)std::round(semitones);
+
+    // Calculate octave and note within octave
+    int octave = 4 + (roundedSemitones / 12);
+    int noteIndex = roundedSemitones % 12;
+
+    // Handle negative modulo correctly
+    if (noteIndex < 0) {
+      noteIndex += 12;
+      octave -= 1;
+    }
+
+    // Note names array (using # for sharps)
+    const char* noteNames[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
+    // Build the note name string
+    std::string noteName = noteNames[noteIndex];
+    noteName += std::to_string(octave);
+
+    return noteName;
   }
   
   // Parses pitch from a cell with various formats
@@ -685,16 +726,16 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
     // Set the number of channels on the poly output to the number of active channels
     outputs[POLY_OUTPUT].setChannels(activeChannels);
     // Handle recording
-    static std::vector<dsp::SchmittTrigger> recordGateTriggers(16);
-    if (inputs[RECORD_GATE_INPUT].isConnected() && inputs[RECORD_IN_INPUT].isConnected()) {
-      int gateChannels = inputs[RECORD_GATE_INPUT].getChannels();
+    static std::vector<dsp::SchmittTrigger> recordTriggers(16);
+    if (inputs[RECORD_TRIGGER_INPUT].isConnected() && inputs[RECORD_IN_INPUT].isConnected()) {
+      int triggerChannels = inputs[RECORD_TRIGGER_INPUT].getChannels();
       int inChannels = inputs[RECORD_IN_INPUT].getChannels();
       bool needsTextUpdate = false;
 
-      // Check for gate triggers
-      for (int i = 0; i < std::min(gateChannels, 16); i++) {
-          if (recordGateTriggers[i].process(inputs[RECORD_GATE_INPUT].getVoltage(i))) {
-              // Gate just went high - record the voltage
+      // Check for trigger rising edges
+      for (int i = 0; i < std::min(triggerChannels, 16); i++) {
+          if (recordTriggers[i].process(inputs[RECORD_TRIGGER_INPUT].getVoltage(i))) {
+              // Trigger rising edge detected - record the voltage
               float recordedVoltage;
               if (inChannels == 1) {
                   // Monophonic input - use for all channels
@@ -709,10 +750,17 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
 
               // Update the text buffer directly
               if (currentStep < (int)steps.size()) {
-                  // Convert voltage to decimal string with 4 decimal places
-                  std::ostringstream ss;
-                  ss << std::fixed << std::setprecision(4) << recordedVoltage;
-                  std::string voltageStr = ss.str();
+                  // Convert voltage to string based on quantize mode
+                  std::string voltageStr;
+                  if (recordQuantizeMode == RECORD_NOTE_NAME) {
+                      // Quantize to nearest note name
+                      voltageStr = voltageToNoteName(recordedVoltage);
+                  } else {
+                      // Store as decimal with 4 decimal places
+                      std::ostringstream ss;
+                      ss << std::fixed << std::setprecision(4) << recordedVoltage;
+                      voltageStr = ss.str();
+                  }
 
                   // Parse text into lines
                   std::istringstream textStream(text);
@@ -1643,7 +1691,7 @@ struct SpellbookWidget : ModuleWidget {
     addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*3.0)), module, Spellbook::RESET_INPUT));
     addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*4.5)), module, Spellbook::INDEX_INPUT));
     addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*7.5)), module, Spellbook::RECORD_IN_INPUT));
-    addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*9)), module, Spellbook::RECORD_GATE_INPUT));
+    addInput(createInputCentered<BrassPort>(mm2px(Vec(GRID_SNAP*1, GRID_SNAP*9)), module, Spellbook::RECORD_TRIGGER_INPUT));
 
     
         // Main text field
@@ -1819,6 +1867,19 @@ struct SpellbookWidget : ModuleWidget {
     menu->addChild(createCheckMenuItem("Up to last non-blank (per row)", "",
       [=]() { return module->polyphonyMode == Spellbook::POLY_UP_TO_LAST; },
       [=]() { module->polyphonyMode = Spellbook::POLY_UP_TO_LAST; }
+    ));
+
+    menu->addChild(new MenuSeparator());
+    menu->addChild(createMenuLabel("Record Quantize Mode"));
+
+    menu->addChild(createCheckMenuItem("Decimal (4 decimal places)", "",
+      [=]() { return module->recordQuantizeMode == Spellbook::RECORD_DECIMAL; },
+      [=]() { module->recordQuantizeMode = Spellbook::RECORD_DECIMAL; }
+    ));
+
+    menu->addChild(createCheckMenuItem("Note names (quantized to semitones)", "",
+      [=]() { return module->recordQuantizeMode == Spellbook::RECORD_NOTE_NAME; },
+      [=]() { module->recordQuantizeMode = Spellbook::RECORD_NOTE_NAME; }
     ));
   }
 };
