@@ -63,6 +63,12 @@ struct Timer {
   }
 };
 
+struct RecordEvent {
+    int step;
+    int channel;
+    float voltage;
+};
+
 struct Spellbook : Module {
     enum ParamId {
         TOGGLE_SWITCH,
@@ -104,6 +110,9 @@ struct Spellbook : Module {
         RECORD_NOTE_NAME      // Quantize to nearest note name (e.g., "G#4")
     };
     RecordQuantizeMode recordQuantizeMode = RECORD_DECIMAL;
+
+    // Queue for recording events (audio thread -> UI thread)
+    std::vector<RecordEvent> recordQueue;
 
     dsp::SchmittTrigger stepForwardTrigger;
   dsp::SchmittTrigger stepBackTrigger;
@@ -725,7 +734,7 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
     }
     // Set the number of channels on the poly output to the number of active channels
     outputs[POLY_OUTPUT].setChannels(activeChannels);
-    // Handle recording
+    // Handle recording - Queue events instead of modifying text directly
     static std::vector<dsp::SchmittTrigger> recordTriggers(16);
     if (inputs[RECORD_TRIGGER_INPUT].isConnected() && inputs[RECORD_IN_INPUT].isConnected()) {
       int triggerChannels = std::min(inputs[RECORD_TRIGGER_INPUT].getChannels(), 16);
@@ -750,31 +759,8 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
           }
       }
 
-      // If we have channels to record, update the text buffer
+      // Queue recording events for UI thread to process
       if (!channelsToRecord.empty() && currentStep < (int)steps.size()) {
-          // Parse text into lines once
-          std::istringstream textStream(text);
-          std::string line;
-          std::vector<std::string> lines;
-          while (std::getline(textStream, line)) {
-              lines.push_back(line);
-          }
-
-          // Make sure we have enough lines
-          while ((int)lines.size() <= currentStep) {
-              lines.push_back("");
-          }
-
-          // Split the current line into cells
-          std::string& currentLine = lines[currentStep];
-          std::vector<std::string> cells;
-          std::istringstream lineStream(currentLine);
-          std::string cell;
-          while (std::getline(lineStream, cell, ',')) {
-              cells.push_back(cell);
-          }
-
-          // Record all triggered channels
           for (int channelIdx : channelsToRecord) {
               // Get the voltage to record
               float recordedVoltage;
@@ -789,57 +775,13 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
                   continue;
               }
 
-              // Convert voltage to string based on quantize mode
-              std::string voltageStr;
-              if (recordQuantizeMode == RECORD_NOTE_NAME) {
-                  // Quantize to nearest note name
-                  voltageStr = voltageToNoteName(recordedVoltage);
-              } else {
-                  // Store as decimal with 4 decimal places, using "C" locale to ensure period decimal separator
-                  std::ostringstream ss;
-                  ss.imbue(std::locale::classic());  // Use "C" locale to force period as decimal separator
-                  ss << std::fixed << std::setprecision(4) << recordedVoltage;
-                  voltageStr = ss.str();
-              }
-
-              // Make sure we have enough cells
-              while ((int)cells.size() <= channelIdx) {
-                  cells.push_back("");
-              }
-
-              // Extract any comment from the existing cell
-              size_t commentPos = cells[channelIdx].find('?');
-              std::string comment = "";
-              if (commentPos != std::string::npos) {
-                  comment = cells[channelIdx].substr(commentPos);
-              }
-
-              // Replace the cell content with the voltage string, preserving comment
-              cells[channelIdx] = voltageStr;
-              if (!comment.empty()) {
-                  cells[channelIdx] += " " + comment;
-              }
+              // Add to record queue
+              RecordEvent event;
+              event.step = currentStep;
+              event.channel = channelIdx;
+              event.voltage = recordedVoltage;
+              recordQueue.push_back(event);
           }
-
-          // Rebuild the line
-          currentLine = "";
-          for (size_t j = 0; j < cells.size(); j++) {
-              currentLine += cells[j];
-              if (j < cells.size() - 1) {
-                  currentLine += ",";
-              }
-          }
-
-          // Rebuild the text
-          text = "";
-          for (size_t j = 0; j < lines.size(); j++) {
-              text += lines[j];
-              if (j < lines.size() - 1) {
-                  text += "\n";
-              }
-          }
-
-          dirty = true;  // Mark for re-parsing
       }
     }
 
@@ -926,6 +868,92 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
       // Update our text and trust the TextField to notice it
       text = newText;
       dirty = true;
+    }
+
+    // Process queued recording events (called from UI thread)
+    void processRecordQueue() {
+      if (recordQueue.empty()) return;
+
+      // Parse text into lines once
+      std::istringstream textStream(text);
+      std::string line;
+      std::vector<std::string> lines;
+      while (std::getline(textStream, line)) {
+          lines.push_back(line);
+      }
+
+      // Process each queued event
+      for (const RecordEvent& event : recordQueue) {
+          int step = event.step;
+          int channelIdx = event.channel;
+          float recordedVoltage = event.voltage;
+
+          // Make sure we have enough lines
+          while ((int)lines.size() <= step) {
+              lines.push_back("");
+          }
+
+          // Split the current line into cells
+          std::string& currentLine = lines[step];
+          std::vector<std::string> cells;
+          std::istringstream lineStream(currentLine);
+          std::string cell;
+          while (std::getline(lineStream, cell, ',')) {
+              cells.push_back(cell);
+          }
+
+          // Convert voltage to string based on quantize mode
+          std::string voltageStr;
+          if (recordQuantizeMode == RECORD_NOTE_NAME) {
+              // Quantize to nearest note name
+              voltageStr = voltageToNoteName(recordedVoltage);
+          } else {
+              // Store as decimal with 4 decimal places, using "C" locale to ensure period decimal separator
+              std::ostringstream ss;
+              ss.imbue(std::locale::classic());  // Use "C" locale to force period as decimal separator
+              ss << std::fixed << std::setprecision(4) << recordedVoltage;
+              voltageStr = ss.str();
+          }
+
+          // Make sure we have enough cells
+          while ((int)cells.size() <= channelIdx) {
+              cells.push_back("");
+          }
+
+          // Extract any comment from the existing cell
+          size_t commentPos = cells[channelIdx].find('?');
+          std::string comment = "";
+          if (commentPos != std::string::npos) {
+              comment = cells[channelIdx].substr(commentPos);
+          }
+
+          // Replace the cell content with the voltage string, preserving comment
+          cells[channelIdx] = voltageStr;
+          if (!comment.empty()) {
+              cells[channelIdx] += " " + comment;
+          }
+
+          // Rebuild the line
+          currentLine = "";
+          for (size_t j = 0; j < cells.size(); j++) {
+              currentLine += cells[j];
+              if (j < cells.size() - 1) {
+                  currentLine += ",";
+              }
+          }
+      }
+
+      // Rebuild the text
+      text = "";
+      for (size_t j = 0; j < lines.size(); j++) {
+          text += lines[j];
+          if (j < lines.size() - 1) {
+              text += "\n";
+          }
+      }
+
+      dirty = true;  // Mark for re-parsing
+      recordQueue.clear();  // Clear the queue after processing
     }
 };
 
@@ -1382,7 +1410,7 @@ struct SpellbookTextField : LedDisplayTextField {
   
   void drawLayer(const DrawArgs& args, int layer) override {
     if (layer != 1) return;  // Only draw on the text layer
-    
+
     // Textfield backdrop
     nvgBeginPath(args.vg);
     nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 200));
@@ -1391,8 +1419,11 @@ struct SpellbookTextField : LedDisplayTextField {
     nvgStrokeColor(args.vg, textColor);  // White color with full opacity
     nvgStrokeWidth(args.vg, 1.0);  // Set the width of the stroke
     nvgStroke(args.vg);  // Apply the stroke to the path
-    
+
     if (!module) return;  // Only proceed if module is active
+
+    // Process any queued recording events (UI thread)
+    module->processRecordQueue();
         
     if (!focused) {
       // Autoscroll logic
