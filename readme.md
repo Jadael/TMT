@@ -536,6 +536,8 @@ Spellbook is a module for VCV Rack to sequence pitch and control voltage (CV) pa
 - **Step Backward**: Advances to the prior step in the sequence on the rising edge of a trigger.
 - **Reset Input**: Resets the sequence to the first step on the rising edge of the input signal.
 - **Index Input**: Set the current step to a specific index, where 0v is the first step through to 10v for the last step, like a phasor controlling a "play head".
+- **Record In**: Voltages to record into the current row (polyphonic). When Record Trigger fires, voltages from this input are written into the sequence text.
+- **Record Trigger**: Rising edge triggers recording of voltages into the current row (polyphonic). Each channel can independently trigger recording of its corresponding Record In channel. If mono, records all Record In channels at once.
 
 - **Index Mode Toggle**: Toggle the yellow glyph to switch to "absolute address" mode, where 1v is step one, 2v is step two, etc.
 
@@ -629,6 +631,29 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 - `Ctrl`+`Enter`: Commit and parse the current text, but stay in editing mode.
 - `Ctrl`+`[` or `Ctrl`+`]`: Decreases or increases the text size.
   
+### Recording Into Sequences
+
+Spellbook can record incoming voltages directly into the sequence text, allowing you to capture CV or audio voltages as part of your sequence:
+
+1. **Basic Recording**: Connect voltage sources to Record In and a trigger/gate to Record Trigger. When the trigger fires on the current row, the voltages are written into the sequence.
+
+2. **Polyphonic Recording**: Both inputs support polyphony up to 16 channels. Each Record Trigger channel independently controls recording of its corresponding Record In channel:
+   - 16-channel Record In + 16-channel Record Trigger = Each channel records independently when its trigger fires
+   - 16-channel Record In + mono Record Trigger = All 16 channels record simultaneously when the single trigger fires
+   - Mono Record In + 16-channel Record Trigger = The same voltage is recorded to each column that triggers
+
+3. **Record Quantize Modes**: Right-click on Spellbook to choose how recorded voltages are formatted:
+   - **Decimal (4 decimal places)**: Records voltages as decimals like `0.5833`, `-1.2500`, `3.1416`
+   - **Note names (quantized to semitones)**: Automatically quantizes voltages to the nearest semitone and records them as note names like `C4`, `G#5`, `Bb3`
+
+4. **Preserving Comments**: Recording preserves any existing comments (text after `?`) in cells, so you can keep your labels and notes while updating values.
+
+Use recording to:
+- Capture random modulation patterns from sources like Seed or sample & hold modules
+- Quantize and record melodies from continuous CV sources
+- Build sequences by "playing them in" rather than typing
+- Sample and sequence audio-rate signals (use decimal mode for full precision)
+
 ### Additional Notes:
 
 ![Spellbook at various sizes](screenshots/spellbook_resizes.jpeg)
@@ -637,15 +662,27 @@ The Spellbook module offers a variety of hotkeys and controls for managing its i
 - **Autoscroll:** When not in editing mode, the text field autoscrolls to keep the currently "playing" step centered, so you can see what the sequence is doing as it plays.
 - **Scrolling**: While in editing mode, you can scroll up and down using the mouse wheel, or in any direction by moving the text cursor until it touches the edge of the viewport.
 
-### Polyphony Mode
+### Context Menu Settings
 
-Right-click on Spellbook to access the context menu and select a polyphony mode. This controls how the polyphonic output determines its channel count:
+Right-click on Spellbook to access these settings:
+
+#### Polyphony Mode
+
+Controls how the polyphonic output determines its channel count:
 
 - **Widest row (constant channels)**: The polyphonic output always has the same number of channels, matching the widest row in the entire sequence. This is useful when you need a consistent channel count throughout playback.
 
 - **Non-blank cells only (variable)**: Each row outputs only its non-blank cells, packed into consecutive channels. For example, a row like `10, 10, , 7` would output 3 channels containing 10, 10, and 7. Empty cells are skipped entirely, and the remaining values are packed together. This is useful for variable polyphony where you want the channel count to shrink and grow based on content.
 
 - **Up to last non-blank (per row)**: Each row outputs channels up to and including the last non-blank cell. For example, `10, 10, , 7` would output 4 channels (10, 10, held-value, 7). Empty cells in the middle still occupy their channel position. This is the default behavior.
+
+#### Record Quantize Mode
+
+Controls how recorded voltages are formatted when using the Record In/Record Trigger inputs:
+
+- **Decimal (4 decimal places)**: Records voltages as decimal numbers with 4 decimal places (e.g., `0.5833`, `-1.2500`, `3.1416`). This is the default mode and preserves full voltage precision.
+
+- **Note names (quantized to semitones)**: Automatically quantizes incoming voltages to the nearest semitone and records them as note names using sharps (e.g., `C4`, `G#5`, `Bb3`, `F#2`). This is useful for recording melodies and ensuring they stay in tune.
 
 ---
 
