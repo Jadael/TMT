@@ -795,8 +795,9 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
                   // Quantize to nearest note name
                   voltageStr = voltageToNoteName(recordedVoltage);
               } else {
-                  // Store as decimal with 4 decimal places
+                  // Store as decimal with 4 decimal places, using "C" locale to ensure period decimal separator
                   std::ostringstream ss;
+                  ss.imbue(std::locale::classic());  // Use "C" locale to force period as decimal separator
                   ss << std::fixed << std::setprecision(4) << recordedVoltage;
                   voltageStr = ss.str();
               }
