@@ -589,37 +589,90 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
     
     int stepCount = steps.size();
     int lastStep = currentStep;
-    
+
+    // Handle recording FIRST - Queue events instead of modifying text directly
+    // This ensures we record to the current step BEFORE advancing
+    static std::vector<dsp::SchmittTrigger> recordTriggers(16);
+    if (inputs[RECORD_TRIGGER_INPUT].isConnected() && inputs[RECORD_IN_INPUT].isConnected()) {
+      int triggerChannels = std::min(inputs[RECORD_TRIGGER_INPUT].getChannels(), 16);
+      int inChannels = std::min(inputs[RECORD_IN_INPUT].getChannels(), 16);
+
+      // Determine which channels to record
+      std::vector<int> channelsToRecord;
+
+      if (triggerChannels == 1) {
+          // Mono trigger: check if it fires, then record ALL input channels
+          if (recordTriggers[0].process(inputs[RECORD_TRIGGER_INPUT].getVoltage(0))) {
+              for (int i = 0; i < inChannels; i++) {
+                  channelsToRecord.push_back(i);
+              }
+          }
+      } else {
+          // Poly trigger: only record channels where trigger fires
+          for (int i = 0; i < triggerChannels; i++) {
+              if (recordTriggers[i].process(inputs[RECORD_TRIGGER_INPUT].getVoltage(i))) {
+                  channelsToRecord.push_back(i);
+              }
+          }
+      }
+
+      // Queue recording events for UI thread to process
+      if (!channelsToRecord.empty() && currentStep < (int)steps.size()) {
+          for (int channelIdx : channelsToRecord) {
+              // Get the voltage to record
+              float recordedVoltage;
+              if (inChannels == 1) {
+                  // Mono input: use for all channels
+                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(0);
+              } else if (channelIdx < inChannels) {
+                  // Poly input: use corresponding channel
+                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(channelIdx);
+              } else {
+                  // Channel index exceeds input channels, skip
+                  continue;
+              }
+
+              // Add to record queue
+              RecordEvent event;
+              event.step = currentStep;
+              event.channel = channelIdx;
+              event.voltage = recordedVoltage;
+              recordQueue.push_back(event);
+          }
+      }
+    }
+
+    // THEN handle step changes
     if (!inputs[INDEX_INPUT].isConnected() && !ignoreClock && !steps.empty()) {
       // Forward step
       if (stepForwardTrigger.process(inputs[STEPFWD_INPUT].getVoltage())) {
         currentStep = (currentStep + 1) % stepCount;
         triggerTimer.reset();
       }
-      
+
       // Backward step
       if (stepBackTrigger.process(inputs[STEPBAK_INPUT].getVoltage())) {
         currentStep = (currentStep - 1 + stepCount) % stepCount;
         triggerTimer.reset();
       }
-      
+
     } else if (inputs[INDEX_INPUT].isConnected()) {
       float indexVoltage = inputs[INDEX_INPUT].getVoltage();
       //int numSteps = steps.size();
-      if (params[TOGGLE_SWITCH].getValue() > 0) { 
+      if (params[TOGGLE_SWITCH].getValue() > 0) {
         currentStep = clamp((int)indexVoltage % stepCount,0,stepCount-1); // Absolute mode (alt)
         //configInput(INDEX_INPUT, "Index (Absolute address, 1v/step)");
       } else {
         float percentage = indexVoltage/10.f; // Treat 10.v as "1.0" for "100%"
-        
+
         float unboundedIndex = percentage * stepCount; // Get the index that is <percentage> through the array
-        
+
         //unboundedIndex -= 0.0001f;
-        
+
         int targetIndex = (int)unboundedIndex % stepCount;
-        
+
         if (targetIndex==0 && std::fabs(unboundedIndex)>1) targetIndex=stepCount;
-        
+
         if (targetIndex < 0) targetIndex+=stepCount;
 
         currentStep = clamp(targetIndex, 0, stepCount-1); // Relative mode (default)
@@ -629,7 +682,7 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
         triggerTimer.reset();
       }
     }
-    
+
     float rowCount = (float)stepCount;
     float relativeIndex = currentStep / (rowCount-1) * 10.f;
     float absoluteIndex = (float)currentStep + 1.f;
@@ -734,56 +787,6 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
     }
     // Set the number of channels on the poly output to the number of active channels
     outputs[POLY_OUTPUT].setChannels(activeChannels);
-    // Handle recording - Queue events instead of modifying text directly
-    static std::vector<dsp::SchmittTrigger> recordTriggers(16);
-    if (inputs[RECORD_TRIGGER_INPUT].isConnected() && inputs[RECORD_IN_INPUT].isConnected()) {
-      int triggerChannels = std::min(inputs[RECORD_TRIGGER_INPUT].getChannels(), 16);
-      int inChannels = std::min(inputs[RECORD_IN_INPUT].getChannels(), 16);
-
-      // Determine which channels to record
-      std::vector<int> channelsToRecord;
-
-      if (triggerChannels == 1) {
-          // Mono trigger: check if it fires, then record ALL input channels
-          if (recordTriggers[0].process(inputs[RECORD_TRIGGER_INPUT].getVoltage(0))) {
-              for (int i = 0; i < inChannels; i++) {
-                  channelsToRecord.push_back(i);
-              }
-          }
-      } else {
-          // Poly trigger: only record channels where trigger fires
-          for (int i = 0; i < triggerChannels; i++) {
-              if (recordTriggers[i].process(inputs[RECORD_TRIGGER_INPUT].getVoltage(i))) {
-                  channelsToRecord.push_back(i);
-              }
-          }
-      }
-
-      // Queue recording events for UI thread to process
-      if (!channelsToRecord.empty() && currentStep < (int)steps.size()) {
-          for (int channelIdx : channelsToRecord) {
-              // Get the voltage to record
-              float recordedVoltage;
-              if (inChannels == 1) {
-                  // Mono input: use for all channels
-                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(0);
-              } else if (channelIdx < inChannels) {
-                  // Poly input: use corresponding channel
-                  recordedVoltage = inputs[RECORD_IN_INPUT].getVoltage(channelIdx);
-              } else {
-                  // Channel index exceeds input channels, skip
-                  continue;
-              }
-
-              // Add to record queue
-              RecordEvent event;
-              event.step = currentStep;
-              event.channel = channelIdx;
-              event.voltage = recordedVoltage;
-              recordQueue.push_back(event);
-          }
-      }
-    }
 
     // Send pre-calculated voltages to right expander (Page modules)
     if (rightExpander.module && rightExpander.module->leftExpander.consumerMessage) {
