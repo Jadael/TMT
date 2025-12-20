@@ -661,6 +661,7 @@ Use recording to:
 - **Resizing:** You can resize the module by dragging the right edge of the panel, to handle different numbers of columns in your sequences. I place minimized Spellbooks with one-column sequences all over my patches for short simple loops all the time.
 - **Autoscroll:** When not in editing mode, the text field autoscrolls to keep the currently "playing" step centered, so you can see what the sequence is doing as it plays.
 - **Scrolling**: While in editing mode, you can scroll up and down using the mouse wheel, or in any direction by moving the text cursor until it touches the edge of the viewport.
+- **Ghost Values:** Empty cells display "ghost values" in dark gray, showing what voltage will actually be output. Empty cells hold the previous value from that column (unless the previous value was a trigger, retrigger, or gate, which resets to 0v). Ghost values wrap around from the end of the sequence to the beginning, so you can always see what each step will output. This makes it easy to understand your sequence at a glance without having to trace back through earlier rows.
 
 ### Context Menu Settings
 

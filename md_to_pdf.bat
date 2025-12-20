@@ -1,3 +1,4 @@
 pandoc readme.md -f markdown+smart -t pdf --pdf-engine=xelatex -V geometry:margin=1in -V mainfont="DejaVu Serif" -V monofont="DejaVu Sans Mono" -V fontsize=10pt --highlight-style=tango --toc -o "T's Musical Tools.pdf"
 pandoc rhythml.md -f markdown+smart -t pdf --pdf-engine=xelatex -V geometry:margin=1in -V mainfont="DejaVu Serif" -V monofont="DejaVu Sans Mono" -V fontsize=10pt --highlight-style=tango --toc --listings -H custom.tex -o "RhythML.pdf"
 pandoc misc/spellbook.md -f markdown+smart -t pdf --pdf-engine=xelatex -V geometry:margin=1in -V mainfont="DejaVu Serif" -V monofont="DejaVu Sans Mono" -V fontsize=10pt --highlight-style=tango --toc -o "help/Spellbook.pdf"
+pause

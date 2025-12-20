@@ -118,6 +118,7 @@ struct Spellbook : Module {
   dsp::SchmittTrigger stepBackTrigger;
   dsp::SchmittTrigger resetTrigger;
     std::vector<std::vector<StepData>> steps;
+  std::vector<std::vector<std::string>> ghostValues;  // Ghost text for empty cells (computed at parse time)
   std::vector<std::string> firstRowComments; // Fill in whenever we check row 1
   std::vector<std::string> currentStepComments; // Continually update as we go, but only if and when we encounter comments, so they're sticky
   Timer triggerTimer; // General purpose stopwatch, used by Triggers and Retriggers
@@ -394,7 +395,21 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 
     return noteName;
   }
-  
+
+  // Format voltage for ghost value display
+  std::string formatVoltageForGhost(float voltage) {
+    // Check if it's close to a note value for cleaner display
+    float semitones = voltage * 12.0f;
+    int roundedSemitones = (int)std::round(semitones);
+    if (std::fabs(semitones - roundedSemitones) < 0.01f) {
+      return voltageToNoteName(voltage);
+    }
+    // Otherwise format as decimal with 2 decimal places
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << voltage;
+    return oss.str();
+  }
+
   // Parses pitch from a cell with various formats
   float parsePitch(const std::string& cell) {
     if (cell.empty()) {
@@ -554,8 +569,91 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     }
 
     currentStep = currentStep % steps.size();
+
+    // Compute ghost values for empty cells
+    computeGhostValues();
   }
-/* 
+
+  // Compute ghost values for empty cells by propagating values downward through each column
+  // Handles wrap-around: empty cells at the start look back to the end of the sequence
+  void computeGhostValues() {
+    // Find the maximum row width
+    int maxWidth = 0;
+    for (const auto& row : steps) {
+      maxWidth = std::max(maxWidth, (int)row.size());
+    }
+
+    // Initialize ghostValues with same dimensions
+    ghostValues.clear();
+    ghostValues.resize(steps.size());
+    for (size_t row = 0; row < steps.size(); row++) {
+      ghostValues[row].resize(maxWidth, "");
+    }
+
+    // For each column, propagate values downward with wrap-around
+    for (int col = 0; col < maxWidth; col++) {
+      // First pass: find the last value in this column (for wrap-around)
+      std::string wrapValue = "";
+      char wrapType = 'U';
+      for (size_t row = 0; row < steps.size(); row++) {
+        if (col < (int)steps[row].size()) {
+          StepData& cell = steps[row][col];
+          if (cell.type == 'N') {
+            wrapValue = formatVoltageForGhost(cell.voltage);
+            wrapType = 'N';
+          } else if (cell.type == 'T' || cell.type == 'R' || cell.type == 'G') {
+            wrapValue = "";
+            wrapType = cell.type;
+          }
+          // 'E' and 'U' don't change the wrap value
+        }
+      }
+
+      // Second pass: propagate values, starting with wrap-around value
+      std::string lastValue = wrapValue;
+      char lastType = wrapType;
+
+      for (size_t row = 0; row < steps.size(); row++) {
+        if (col < (int)steps[row].size()) {
+          StepData& cell = steps[row][col];
+          if (cell.type == 'N') {
+            // Normal value - format it and remember
+            lastValue = formatVoltageForGhost(cell.voltage);
+            lastType = 'N';
+          } else if (cell.type == 'T' || cell.type == 'R' || cell.type == 'G') {
+            // Rhythm symbol - clear the propagated value
+            lastValue = "";
+            lastType = cell.type;
+          } else if (cell.type == 'E') {
+            // Empty cell - use ghost value if available
+            if (lastType == 'N' && !lastValue.empty()) {
+              ghostValues[row][col] = lastValue;
+            }
+            // Keep lastValue/lastType unchanged for further propagation
+          }
+          // 'U' cells: don't update lastValue, treat as transparent
+        } else {
+          // Row is shorter than maxWidth - treat as empty
+          if (lastType == 'N' && !lastValue.empty()) {
+            ghostValues[row][col] = lastValue;
+          }
+        }
+      }
+    }
+
+    // Reset lastValues to prevent "stuck" outputs after editing
+    for (int i = 0; i < MAX_EXPANDER_COLUMNS; i++) {
+      if (!steps.empty() && i < (int)steps[0].size() && steps[0][i].type == 'N') {
+        lastValues[i].voltage = steps[0][i].voltage;
+        lastValues[i].type = 'N';
+      } else {
+        lastValues[i].voltage = 0.0f;
+        lastValues[i].type = 'U';
+      }
+    }
+  }
+
+/*
   .-.     .-.     .-.     .-.     .-.     .-.     .-.     .-.     .-.     .-.
 dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
 '     `-'     `-'     `-'     `-'     `-'     `-'     `-'     `-'     `-'     `
@@ -1018,10 +1116,13 @@ struct SpellbookTextField : LedDisplayTextField {
   NVGcolor commentCharColor = nvgRGB(121, 8, 170); // Dark purple for `?`
   NVGcolor selectionColor = nvgRGB(39, 1, 52); // Darkest purple for selection highlight
   NVGcolor currentStepColor = nvgRGB(255, 255, 255); // White current step when autoscrolling
+  NVGcolor ghostColor = nvgRGB(55, 55, 55); // Very dark gray for ghost values (just brighter than zebra stripes)
   NVGcolor cursorColor = nvgRGBA(158, 80, 191,192); // Light translucent purple for cursor
   NVGcolor lineColor = textColor;
   NVGcolor activeColor = textColor;
-  
+  std::vector<size_t> firstRowColumnPositions;  // Character positions of column starts from row 1 (for ghost drawing in short rows)
+  std::vector<size_t> columnCumulativeGhostExtras;  // Cumulative ghost extra characters for each column (for text offset)
+
     SpellbookTextField() {
         this->textOffset = Vec(0,0);
     }
@@ -1483,17 +1584,39 @@ struct SpellbookTextField : LedDisplayTextField {
       nvgFill(args.vg);
     } else {
       // Draw column backgrounds
-      std::getline(lines, line); // Assume the first line gives the column layout
+      // Calculate column widths considering ghost values across all rows
+      std::getline(lines, line); // First line gives the base column layout
       std::vector<float> columnWidths;
+      firstRowColumnPositions.clear();  // Store visual character positions for ghost drawing in short rows
+      columnCumulativeGhostExtras.clear();  // Store cumulative ghost extras per column
       size_t startPos = 0;
+      size_t colIndex = 0;
+      size_t cumulativeGhostExtra = 0;  // Track cumulative ghost extras
       while (startPos < line.length()) {
+        firstRowColumnPositions.push_back(startPos + cumulativeGhostExtra);  // Visual position including prior ghost extras
+        columnCumulativeGhostExtras.push_back(cumulativeGhostExtra);  // Store cumulative ghost extra for this column
         size_t nextComma = line.find(',', startPos);
         if (nextComma == std::string::npos) {
           nextComma = line.length();
         }
         size_t columnLength = nextComma - startPos + 1; // Include comma space in the width calculation
-        columnWidths.push_back(columnLength * charWidth);
+
+        // Check if this column has a ghost value that would add width
+        size_t ghostExtra = 0;
+        if (module) {
+          // Scan all rows for this column to find any ghost that adds width
+          for (size_t row = 0; row < module->ghostValues.size(); row++) {
+            if (colIndex < module->ghostValues[row].size() && !module->ghostValues[row][colIndex].empty()) {
+              ghostExtra = std::max(ghostExtra, module->ghostValues[row][colIndex].length());
+            }
+          }
+        }
+
+        float colWidth = (columnLength + ghostExtra) * charWidth;
+        columnWidths.push_back(colWidth);
+        cumulativeGhostExtra += ghostExtra;  // Add this column's ghost extra to cumulative
         startPos = nextComma + 1; // Skip comma
+        colIndex++;
       }
 
       float columnStart = x;
@@ -1544,9 +1667,89 @@ struct SpellbookTextField : LedDisplayTextField {
       }
       
       activeColor = lineColor;
-      
+
+      // Draw ghost values for empty cells (only when not focused / in playback mode)
+      // Also track offsets for cells with ghosts so comments don't overlap
+      std::map<size_t, size_t> ghostOffsets;  // Maps cell start position to ghost text length
+      if (!focused && module && lineIndex < (int)module->ghostValues.size()) {
+        // Parse line into cells to find positions
+        std::vector<size_t> cellStarts;
+        cellStarts.push_back(0);
+        for (size_t i = 0; i < line.length(); i++) {
+          if (line[i] == ',') {
+            cellStarts.push_back(i + 1);
+          }
+        }
+
+        // For each cell, check if it's empty and has a ghost value
+        for (size_t col = 0; col < cellStarts.size() && col < module->ghostValues[lineIndex].size(); col++) {
+          size_t cellStart = cellStarts[col];
+          size_t cellEnd = (col + 1 < cellStarts.size()) ? cellStarts[col + 1] - 1 : line.length();
+
+          // Check if cell content (before any ?) is empty
+          std::string cellContent = (cellEnd > cellStart) ? line.substr(cellStart, cellEnd - cellStart) : "";
+          size_t commentPos = cellContent.find('?');
+          bool hasComment = (commentPos != std::string::npos);
+          if (hasComment) {
+            cellContent = cellContent.substr(0, commentPos);
+          }
+          // Trim whitespace to check if empty
+          bool isEmpty = cellContent.find_first_not_of(" \t") == std::string::npos;
+
+          if (isEmpty && !module->ghostValues[lineIndex][col].empty()) {
+            // Calculate ghost position with cumulative offset from previous columns
+            float colOffset = (col < columnCumulativeGhostExtras.size()) ? columnCumulativeGhostExtras[col] * charWidth : 0;
+            float ghostX = x + cellStart * charWidth + colOffset;
+            nvgFillColor(args.vg, ghostColor);
+            nvgText(args.vg, ghostX, y, module->ghostValues[lineIndex][col].c_str(), NULL);
+            // Track offset so comments get pushed right
+            if (hasComment) {
+              ghostOffsets[cellStart] = module->ghostValues[lineIndex][col].length();
+            }
+          }
+        }
+
+        // Also draw ghosts for columns beyond the line's text (short rows)
+        // Use the stored firstRowColumnPositions to know where to draw
+        for (size_t col = cellStarts.size(); col < module->ghostValues[lineIndex].size(); col++) {
+          if (!module->ghostValues[lineIndex][col].empty() && col < firstRowColumnPositions.size()) {
+            float ghostX = x + firstRowColumnPositions[col] * charWidth;  // firstRowColumnPositions already includes cumulative offsets
+            nvgFillColor(args.vg, ghostColor);
+            nvgText(args.vg, ghostX, y, module->ghostValues[lineIndex][col].c_str(), NULL);
+          }
+        }
+      }
+
+      // Track current ghost offset for character drawing
+      float currentCellGhostOffset = 0;  // Offset for ghost within current cell
+      float currentColumnOffset = 0;     // Cumulative offset from ghost extras in previous columns
+      size_t currentColumn = 0;
+      size_t currentCellStart = 0;
       for (size_t i = 0; i < line.length(); ++i) {
-        float charX = x + i * charWidth;  // X position of the character
+        // Check if we've entered a new cell and update offsets
+        if (line[i] == ',') {
+          currentColumn++;
+          currentCellGhostOffset = 0;  // Reset cell ghost offset at cell boundary
+          // Update cumulative column offset for next column
+          if (!focused && currentColumn < columnCumulativeGhostExtras.size()) {
+            currentColumnOffset = columnCumulativeGhostExtras[currentColumn] * charWidth;
+          }
+        } else if (i == 0 || line[i-1] == ',') {
+          // Start of a cell - check for ghost offset within this cell
+          currentCellStart = i;
+          auto it = ghostOffsets.find(currentCellStart);
+          if (it != ghostOffsets.end()) {
+            currentCellGhostOffset = it->second * charWidth;
+          } else {
+            currentCellGhostOffset = 0;
+          }
+          // Also set cumulative column offset
+          if (!focused && currentColumn < columnCumulativeGhostExtras.size()) {
+            currentColumnOffset = columnCumulativeGhostExtras[currentColumn] * charWidth;
+          }
+        }
+
+        float charX = x + i * charWidth + currentColumnOffset + currentCellGhostOffset;  // X position with all offsets
         
         // If focused, draw selection background for this character if within selection bounds
         if (focused && static_cast<size_t>(currentPos + i) >= static_cast<size_t>(selectionStart) && static_cast<size_t>(currentPos + i) < static_cast<size_t>(selectionEnd)) {
