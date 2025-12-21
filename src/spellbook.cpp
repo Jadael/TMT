@@ -294,6 +294,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     // Checks if a string represents a decimal number
     bool isDecimal(const std::string& s) {
         bool decimalPoint = false;
+        bool hasDigit = false;
         auto it = s.begin();
         if (!s.empty() && (s.front() == '-' || s.front() == '+')) {
             it++; // Skip the sign for checking digits
@@ -304,10 +305,12 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
                 decimalPoint = true;
             } else if (!isdigit(*it)) {
                 break; // Invalid if non-digit characters found
+            } else {
+                hasDigit = true;
             }
             ++it;
         }
-        return it == s.end() && s.size() > (s.front() == '-' || s.front() == '+' ? 1 : 0);
+        return it == s.end() && hasDigit;
     }
   
   // Map of accidental symbols to semitone shifts
