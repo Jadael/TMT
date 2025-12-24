@@ -35,6 +35,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 struct StepData {
     float voltage;
     char type;  // 'N' for normal, 'T' for trigger, 'R' for retrigger, 'G' for gate, 'E' for empty, 'U' for unused
+    std::string originalText;  // Original cell text for ghost value display
 };
 
 struct Timer {
@@ -157,7 +158,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     // Expander message buffers (static allocation to avoid DLL issues)
     SpellbookExpanderMessage rightMessages[2];
 
-  Spellbook() : lastValues(MAX_EXPANDER_COLUMNS, {0.0f, 'N'}) {  // Support up to 128 columns for expanders
+  Spellbook() : lastValues(MAX_EXPANDER_COLUMNS, {0.0f, 'N', ""}) {  // Support up to 128 columns for expanders
     config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
     configInput(STEPFWD_INPUT, "Step Forward");
     configInput(STEPBAK_INPUT, "Step Backward");
@@ -513,7 +514,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     std::istringstream ss(text);
     std::string line;
     while (getline(ss, line)) {
-      std::vector<StepData> stepData(MAX_EXPANDER_COLUMNS, StepData{0.0f, 'U'});  // Support up to 128 columns
+      std::vector<StepData> stepData(MAX_EXPANDER_COLUMNS, StepData{0.0f, 'U', ""});  // Support up to 128 columns
       std::istringstream lineStream(line);
       std::string cell;
       int index = 0;
@@ -526,7 +527,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
                  [](unsigned char c) { return std::toupper(c); });  // Convert to upper case
         cell.erase(std::remove_if(cell.begin(), cell.end(), ::isspace), cell.end());  // Clean cell from spaces
         // (===||:::::::::::::::>
-        if (!cell.empty()) { 
+        if (!cell.empty()) {
           if (cell == "W" || cell == "|") {
             stepData[index].voltage = 10.0f; // Gates are 10v as far as the next cell should know
             stepData[index].type = 'G';  // Full Width Gate (stay 10v the entire step)
@@ -539,14 +540,21 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
           } else {
             stepData[index].voltage = parsePitch(cell);
             stepData[index].type = 'N'; // Normal, anything that translates to a simple voltage/pitch
+            stepData[index].originalText = cell;  // Preserve original text for ghost display
           }
         } else {
             stepData[index].voltage = 0.0f;
             stepData[index].type = 'E';  // Empty (but "active")
         } // @)}---^-----
 // @)}-^--v--
-          
+
         index++;
+      }
+
+      // Blank lines should have one empty cell (not unused)
+      if (index == 0) {
+        stepData[0].type = 'E';
+        index = 1;
       }
 
       // Trim unused columns - find the last non-unused column
@@ -568,7 +576,7 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
     }
 
     if (steps.empty()) {
-      steps.push_back(std::vector<StepData>(1, StepData{0.0f, 'U'}));
+      steps.push_back(std::vector<StepData>(1, StepData{0.0f, 'U', ""}));
     }
 
     currentStep = currentStep % steps.size();
@@ -602,10 +610,10 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
         if (col < (int)steps[row].size()) {
           StepData& cell = steps[row][col];
           if (cell.type == 'N') {
-            wrapValue = formatVoltageForGhost(cell.voltage);
+            wrapValue = cell.originalText;  // Use original text for ghost display
             wrapType = 'N';
           } else if (cell.type == 'T' || cell.type == 'R' || cell.type == 'G') {
-            wrapValue = "";
+            wrapValue = "0";  // Triggers/gates reset to 0
             wrapType = cell.type;
           }
           // 'E' and 'U' don't change the wrap value
@@ -620,25 +628,33 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
         if (col < (int)steps[row].size()) {
           StepData& cell = steps[row][col];
           if (cell.type == 'N') {
-            // Normal value - format it and remember
-            lastValue = formatVoltageForGhost(cell.voltage);
+            // Normal value - use original text
+            lastValue = cell.originalText;
             lastType = 'N';
           } else if (cell.type == 'T' || cell.type == 'R' || cell.type == 'G') {
-            // Rhythm symbol - clear the propagated value
-            lastValue = "";
+            // Rhythm symbol - subsequent empty cells should output 0
+            lastValue = "0";
             lastType = cell.type;
           } else if (cell.type == 'E') {
             // Empty cell - use ghost value if available
+            // Add leading space for columns after the first (to align with space after comma)
+            std::string prefix = (col > 0) ? " " : "";
             if (lastType == 'N' && !lastValue.empty()) {
-              ghostValues[row][col] = lastValue;
+              ghostValues[row][col] = prefix + lastValue;
+            } else if ((lastType == 'T' || lastType == 'R' || lastType == 'G') && !lastValue.empty()) {
+              // After trigger/gate, show "0" to indicate output will be 0
+              ghostValues[row][col] = prefix + lastValue;
             }
             // Keep lastValue/lastType unchanged for further propagation
           }
           // 'U' cells: don't update lastValue, treat as transparent
         } else {
           // Row is shorter than maxWidth - treat as empty
+          std::string prefix = (col > 0) ? " " : "";
           if (lastType == 'N' && !lastValue.empty()) {
-            ghostValues[row][col] = lastValue;
+            ghostValues[row][col] = prefix + lastValue;
+          } else if ((lastType == 'T' || lastType == 'R' || lastType == 'G') && !lastValue.empty()) {
+            ghostValues[row][col] = prefix + lastValue;
           }
         }
       }
@@ -890,7 +906,7 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
     outputs[POLY_OUTPUT].setChannels(activeChannels);
 
     // Send pre-calculated voltages to right expander (Page modules)
-    if (rightExpander.module && rightExpander.module->leftExpander.consumerMessage) {
+    if (rightExpander.module && rightExpander.module->model == modelPage && rightExpander.module->leftExpander.consumerMessage) {
       SpellbookExpanderMessage* message = (SpellbookExpanderMessage*)rightExpander.module->leftExpander.consumerMessage;
 
       message->baseID = id;

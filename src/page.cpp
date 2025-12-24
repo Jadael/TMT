@@ -90,8 +90,10 @@ struct Page : Module {
 
     void process(const ProcessArgs& args) override {
         // Read message from left module (either Spellbook or another Page)
-        if (leftExpander.module && leftExpander.consumerMessage) {
-            // Verify it's a Spellbook or Page module by checking the message
+        bool validLeftExpander = leftExpander.module &&
+            (leftExpander.module->model == modelSpellbook || leftExpander.module->model == modelPage) &&
+            leftExpander.consumerMessage;
+        if (validLeftExpander) {
             SpellbookExpanderMessage* message = (SpellbookExpanderMessage*)leftExpander.consumerMessage;
 
             // Update our position and base ID
@@ -135,8 +137,8 @@ struct Page : Module {
 
                 outputs[POLY_OUTPUT].setChannels(activeChannels);
 
-                // Forward message to right expander (if any)
-                if (rightExpander.module && rightExpander.module->leftExpander.consumerMessage) {
+                // Forward message to right expander (if it's another Page)
+                if (rightExpander.module && rightExpander.module->model == modelPage && rightExpander.module->leftExpander.consumerMessage) {
                     SpellbookExpanderMessage* rightMessage = (SpellbookExpanderMessage*)rightExpander.module->leftExpander.consumerMessage;
                     rightMessage->baseID = baseID;
                     rightMessage->position = position + 1;  // Increment position
