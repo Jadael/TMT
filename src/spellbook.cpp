@@ -24,6 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <map>
 #include <iomanip>
 #include <regex>
+#include <mutex>
 
 #define GRID_SNAP 10.16 // 10.16mm grid for placing components
 #define SPELLBOOK_DEFAULT_WIDTH 48
@@ -119,12 +120,12 @@ struct Spellbook : Module {
   dsp::SchmittTrigger stepBackTrigger;
   dsp::SchmittTrigger resetTrigger;
     std::vector<std::vector<StepData>> steps;
-  std::vector<std::vector<std::string>> ghostValues;  // Ghost text for empty cells (computed at parse time)
   std::vector<std::string> firstRowComments; // Fill in whenever we check row 1
   std::vector<std::string> currentStepComments; // Continually update as we go, but only if and when we encounter comments, so they're sticky
   Timer triggerTimer; // General purpose stopwatch, used by Triggers and Retriggers
   Timer resetIgnoreTimer; // Timer to ignore Clock input briefly after Reset triggers
     std::vector<StepData> lastValues;
+  std::mutex textMutex;  // Protects 'text' between UI thread writes and audio thread reads
     int currentStep = 0;
   int width = SPELLBOOK_DEFAULT_WIDTH; // Default width for the module is 48hp
   // Map of accidentals and their offsets
@@ -190,6 +191,8 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
       rightMessages[i].currentStep = 0;
       rightMessages[i].totalSteps = 0;
       rightMessages[i].totalColumns = 0;
+      rightMessages[i].maxColumns = 0;
+      rightMessages[i].polyphonyMode = 0;
       for (int j = 0; j < MAX_EXPANDER_COLUMNS; j++) {
         rightMessages[i].outputVoltages[j] = 0.0f;
       }
@@ -581,86 +584,12 @@ C4 ? Pitches do NOT automatically create triggers..., ? ...you need a trigger co
 
     currentStep = currentStep % steps.size();
 
-    // Compute ghost values for empty cells
-    computeGhostValues();
+    // Reset lastValues to prevent stuck outputs after editing (ghost display is handled by UI thread)
+    resetLastValues();
   }
 
-  // Compute ghost values for empty cells by propagating values downward through each column
-  // Handles wrap-around: empty cells at the start look back to the end of the sequence
-  void computeGhostValues() {
-    // Find the maximum row width
-    int maxWidth = 0;
-    for (const auto& row : steps) {
-      maxWidth = std::max(maxWidth, (int)row.size());
-    }
-
-    // Initialize ghostValues with same dimensions
-    ghostValues.clear();
-    ghostValues.resize(steps.size());
-    for (size_t row = 0; row < steps.size(); row++) {
-      ghostValues[row].resize(maxWidth, "");
-    }
-
-    // For each column, propagate values downward with wrap-around
-    for (int col = 0; col < maxWidth; col++) {
-      // First pass: find the last value in this column (for wrap-around)
-      std::string wrapValue = "";
-      char wrapType = 'U';
-      for (size_t row = 0; row < steps.size(); row++) {
-        if (col < (int)steps[row].size()) {
-          StepData& cell = steps[row][col];
-          if (cell.type == 'N') {
-            wrapValue = cell.originalText;  // Use original text for ghost display
-            wrapType = 'N';
-          } else if (cell.type == 'T' || cell.type == 'R' || cell.type == 'G') {
-            wrapValue = "0";  // Triggers/gates reset to 0
-            wrapType = cell.type;
-          }
-          // 'E' and 'U' don't change the wrap value
-        }
-      }
-
-      // Second pass: propagate values, starting with wrap-around value
-      std::string lastValue = wrapValue;
-      char lastType = wrapType;
-
-      for (size_t row = 0; row < steps.size(); row++) {
-        if (col < (int)steps[row].size()) {
-          StepData& cell = steps[row][col];
-          if (cell.type == 'N') {
-            // Normal value - use original text
-            lastValue = cell.originalText;
-            lastType = 'N';
-          } else if (cell.type == 'T' || cell.type == 'R' || cell.type == 'G') {
-            // Rhythm symbol - subsequent empty cells should output 0
-            lastValue = "0";
-            lastType = cell.type;
-          } else if (cell.type == 'E') {
-            // Empty cell - use ghost value if available
-            // Add leading space for columns after the first (to align with space after comma)
-            std::string prefix = (col > 0) ? " " : "";
-            if (lastType == 'N' && !lastValue.empty()) {
-              ghostValues[row][col] = prefix + lastValue;
-            } else if ((lastType == 'T' || lastType == 'R' || lastType == 'G') && !lastValue.empty()) {
-              // After trigger/gate, show "0" to indicate output will be 0
-              ghostValues[row][col] = prefix + lastValue;
-            }
-            // Keep lastValue/lastType unchanged for further propagation
-          }
-          // 'U' cells: don't update lastValue, treat as transparent
-        } else {
-          // Row is shorter than maxWidth - treat as empty
-          std::string prefix = (col > 0) ? " " : "";
-          if (lastType == 'N' && !lastValue.empty()) {
-            ghostValues[row][col] = prefix + lastValue;
-          } else if ((lastType == 'T' || lastType == 'R' || lastType == 'G') && !lastValue.empty()) {
-            ghostValues[row][col] = prefix + lastValue;
-          }
-        }
-      }
-    }
-
-    // Reset lastValues to prevent "stuck" outputs after editing
+  // Reset lastValues to first-step values after a text edit, to prevent "stuck" outputs
+  void resetLastValues() {
     for (int i = 0; i < MAX_EXPANDER_COLUMNS; i++) {
       if (!steps.empty() && i < (int)steps[0].size() && steps[0][i].type == 'N') {
         lastValues[i].voltage = steps[0][i].voltage;
@@ -698,8 +627,12 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
     bool ignoreClock = !resetIgnoreTimer.check(0.005f);
 
     if (dirty) {
-      parseText();  // Reparse the text into steps
-      dirty = false;
+      if (textMutex.try_lock()) {
+        parseText();  // Reparse the text into steps (reads this->text under lock)
+        dirty = false;
+        textMutex.unlock();
+      }
+      // If UI thread holds the lock, skip this sample — dirty stays true, we retry next sample
     }
     
     if (steps.empty()) return;  // If still empty after parsing, skip processing
@@ -826,9 +759,10 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
         break;
       }
       case POLY_NON_BLANK: {
-        // Count only non-blank (non-E, non-U) cells in current row
-        // For a row like "10, 10, , 10" this outputs 3 channels
-        for (int i = 0; i < 16 && i < (int)currentValues.size(); i++) {
+        // Count non-blank (non-E, non-U) cells across the ENTIRE row, including
+        // columns that would otherwise go to Page expanders. This lets the packed
+        // poly output represent all voices regardless of physical column position.
+        for (int i = 0; i < (int)currentValues.size() && activeChannels < 16; i++) {
           if (currentValues[i].type != 'U' && currentValues[i].type != 'E') {
             activeChannels++;
           }
@@ -849,9 +783,30 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
     }
 
     int polyChannel = 0;  // Track which poly channel to output to (for POLY_NON_BLANK packing)
-    for (int i = 0; i < 16; i++) { // Use PORT_MAX_CHANNELS instead of 16?
+    for (int i = 0; i < 16; i++) {
+      // Columns beyond this row's natural width are absent — output 0v, don't update lastValues.
+      // This distinguishes "explicitly empty cell" (E, holds last value) from
+      // "row is shorter here" (U/absent, outputs 0v with no memory).
+      if (i >= (int)currentValues.size()) {
+        if (polyphonyMode == POLY_NON_BLANK) {
+          // Variable-width: absent columns are truly absent — 0v, no memory
+          outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
+          outputs[POLY_OUTPUT].setVoltage(0.0f, i);
+        } else {
+          // Fixed-width: absent columns hold their last value, same as 'E' cells
+          float outputValue = lastValues[i].voltage;
+          if (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R') {
+            outputValue = 0.0f;
+          }
+          outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
+          outputs[POLY_OUTPUT].setVoltage(outputValue, i);
+          // Don't update lastValues — held type/voltage persists to the next step
+        }
+        continue;
+      }
+
       StepData& step = currentValues[i];
-      float outputValue = lastValues[i].voltage;  // Default  to last known voltage
+      float outputValue = lastValues[i].voltage;  // Default to last known voltage
 
       switch (step.type) {
         case 'T':  // Trigger
@@ -877,9 +832,14 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
           outputValue = step.voltage;
           break;
         case 'E':  // Empty cells
-          if (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R') {
+          if (polyphonyMode == POLY_NON_BLANK) {
+            // Variable-width mode: empty cells are nonexistent — 0v, no hold
+            outputValue = 0.0f;
+          } else if (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R') {
+            // Fixed-width mode: hold last value, but go to 0 after a gate/trigger
             outputValue = 0.0f;
           }
+          // else: hold lastValues[i].voltage (the default set above)
           break;
         case 'U': // Unused cells
           outputValue = 0.f;
@@ -902,6 +862,49 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
       lastValues[i].voltage = outputValue;
       lastValues[i].type = step.type;
     }
+
+    // For POLY_NON_BLANK: also pack columns 17+ (indices 16+) into the poly output.
+    // The main loop above only covers the 16 mono outputs; overflow columns still need
+    // to be packed when they are non-blank and variable-width collapsing puts them here.
+    if (polyphonyMode == POLY_NON_BLANK) {
+      for (int i = 16; i < (int)currentValues.size() && polyChannel < 16; i++) {
+        StepData& step = currentValues[i];
+        float outputValue = lastValues[i].voltage;
+
+        switch (step.type) {
+          case 'T':
+            outputValue = triggerTimer.check(0.002f) ? 0.0f : triggerTimer.check(0.001f) ? 10.0f : 0.0f;
+            break;
+          case 'R':
+            outputValue = !triggerTimer.check(0.001f) ? 0.0f : 10.0f;
+            break;
+          case 'G':
+            outputValue = 10.0f;
+            break;
+          case 'N':
+            outputValue = step.voltage;
+            break;
+          case 'E':
+            if (lastValues[i].type == 'G' || lastValues[i].type == 'T' || lastValues[i].type == 'R') {
+              outputValue = 0.0f;
+            }
+            break;
+          case 'U':
+            outputValue = 0.0f;
+            break;
+          default:
+            break;
+        }
+
+        lastValues[i].voltage = outputValue;
+        lastValues[i].type = step.type;
+
+        if (step.type != 'U' && step.type != 'E') {
+          outputs[POLY_OUTPUT].setVoltage(outputValue, polyChannel++);
+        }
+      }
+    }
+
     // Set the number of channels on the poly output to the number of active channels
     outputs[POLY_OUTPUT].setChannels(activeChannels);
 
@@ -920,6 +923,14 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
         totalColumns = steps[currentStep].size();
       }
       message->totalColumns = totalColumns;
+
+      // Compute max columns across all steps so Page can give a consistent channel count
+      int maxCols = 0;
+      for (const auto& row : steps) {
+        maxCols = std::max(maxCols, (int)row.size());
+      }
+      message->maxColumns = maxCols;
+      message->polyphonyMode = (int)polyphonyMode;
 
       // Calculate output voltages for ALL columns (up to MAX_EXPANDER_COLUMNS)
       // This includes columns 1-16 (handled by Spellbook) and 17+ (handled by Page expanders)
@@ -978,6 +989,31 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
         }
 
         message->outputVoltages[i] = outputValue;
+      }
+
+      // For POLY_NON_BLANK: re-pack outputVoltages so Page receives packed overflow voices
+      // (voices 17+) at slots [0],[1],..., not at their absolute column positions.
+      // This keeps variable-width collapsing consistent: if all voices fit in Spellbook's 16
+      // poly channels, Page gets totalColumns=0 and outputs nothing.
+      if (polyphonyMode == POLY_NON_BLANK) {
+        for (int i = 0; i < MAX_EXPANDER_COLUMNS; i++) {
+          message->outputVoltages[i] = 0.0f;
+        }
+        int packedVoice = 0;
+        int overflowSlot = 0;
+        if (currentStep < (int)steps.size()) {
+          for (int i = 0; i < (int)steps[currentStep].size() && overflowSlot < MAX_EXPANDER_COLUMNS; i++) {
+            const StepData& step = steps[currentStep][i];
+            if (step.type == 'U' || step.type == 'E') continue;
+            if (packedVoice >= 16) {
+              // lastValues[i] was already updated by the main/overflow loops above
+              message->outputVoltages[overflowSlot++] = (i < (int)lastValues.size()) ? lastValues[i].voltage : 0.0f;
+            }
+            packedVoice++;
+          }
+        }
+        message->totalColumns = overflowSlot;
+        message->maxColumns = overflowSlot;
       }
 
       rightExpander.module->leftExpander.messageFlipRequested = true;
@@ -1063,16 +1099,18 @@ dtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\dtodtod\odtodto\todtodt\
           }
       }
 
-      // Rebuild the text
-      text = "";
-      for (size_t j = 0; j < lines.size(); j++) {
-          text += lines[j];
-          if (j < lines.size() - 1) {
-              text += "\n";
-          }
+      // Rebuild the text under the mutex so the audio thread can't read a partial write
+      {
+        std::lock_guard<std::mutex> lock(textMutex);
+        text = "";
+        for (size_t j = 0; j < lines.size(); j++) {
+            text += lines[j];
+            if (j < lines.size() - 1) {
+                text += "\n";
+            }
+        }
+        dirty = true;  // Mark for re-parsing (inside lock so audio thread sees consistent state)
       }
-
-      dirty = true;  // Mark for re-parsing
       recordQueue.clear();  // Clear the queue after processing
     }
 };
@@ -1137,6 +1175,93 @@ struct SpellbookTextField : LedDisplayTextField {
   NVGcolor currentStepColor = nvgRGB(255, 255, 255); // White current step when autoscrolling
   NVGcolor ghostColor = nvgRGB(55, 55, 55); // Very dark gray for ghost values (just brighter than zebra stripes)
   NVGcolor cursorColor = nvgRGBA(158, 80, 191,192); // Light translucent purple for cursor
+
+  // Ghost values for empty cells — UI-thread-only, no sharing with audio thread
+  std::vector<std::vector<std::string>> ghostValues;
+
+  // Recompute ghost display values from the current widget text.
+  // Called on the UI thread whenever the text changes, so it never races with the audio thread.
+  void computeGhostValuesFromText() {
+    struct CellInfo { char type; std::string originalText; };
+    std::vector<std::vector<CellInfo>> allCells;
+    size_t maxCols = 0;
+
+    std::string rawText = getText() + "\n";
+    std::istringstream ss(rawText);
+    std::string line;
+    while (std::getline(ss, line)) {
+      std::vector<CellInfo> row;
+      std::istringstream lineStream(line);
+      std::string cell;
+      while (std::getline(lineStream, cell, ',')) {
+        // Strip comment
+        size_t commentPos = cell.find('?');
+        if (commentPos != std::string::npos) cell = cell.substr(0, commentPos);
+        // Trim whitespace
+        size_t last = cell.find_last_not_of(" \n\r\t");
+        cell = (last == std::string::npos) ? "" : cell.substr(0, last + 1);
+        size_t first = cell.find_first_not_of(" \n\r\t");
+        cell = (first == std::string::npos) ? "" : cell.substr(first);
+        // Classify
+        std::string upper = cell;
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+        upper.erase(std::remove_if(upper.begin(), upper.end(), ::isspace), upper.end());
+        CellInfo ci;
+        if (upper.empty())                          { ci.type = 'E'; ci.originalText = ""; }
+        else if (upper == "W" || upper == "|")      { ci.type = 'G'; ci.originalText = cell; }
+        else if (upper == "T" || upper == "^")      { ci.type = 'T'; ci.originalText = cell; }
+        else if (upper == "X" || upper == "R" || upper == "_") { ci.type = 'R'; ci.originalText = cell; }
+        else                                        { ci.type = 'N'; ci.originalText = cell; }
+        row.push_back(ci);
+      }
+      if (row.empty()) row.push_back({'E', ""});
+      maxCols = std::max(maxCols, row.size());
+      allCells.push_back(row);
+    }
+
+    if (allCells.empty()) { ghostValues.clear(); return; }
+    ghostValues.assign(allCells.size(), std::vector<std::string>(maxCols, ""));
+
+    for (size_t col = 0; col < maxCols; col++) {
+      // Find last non-empty value in column for wrap-around
+      std::string wrapGhost = "";
+      for (size_t row = 0; row < allCells.size(); row++) {
+        if (col < allCells[row].size()) {
+          const auto& ci = allCells[row][col];
+          if (ci.type == 'N')                                             wrapGhost = ci.originalText;
+          else if (ci.type == 'T' || ci.type == 'R' || ci.type == 'G')  wrapGhost = "0";
+        }
+      }
+      // Propagate downward with wrap-around start
+      std::string currentGhost = wrapGhost;
+      for (size_t row = 0; row < allCells.size(); row++) {
+        if (col < allCells[row].size()) {
+          const auto& ci = allCells[row][col];
+          if (ci.type == 'N')                                             currentGhost = ci.originalText;
+          else if (ci.type == 'T' || ci.type == 'R' || ci.type == 'G')  currentGhost = "0";
+          else if (ci.type == 'E' && !currentGhost.empty()) {
+            // Fixed-width modes show a ghost (held value) for empty cells.
+            // POLY_NON_BLANK (variable-width) treats empty cells as nonexistent — no ghost.
+            bool fixedWidth = !module || module->polyphonyMode != Spellbook::POLY_NON_BLANK;
+            if (fixedWidth) {
+              std::string prefix = (col > 0) ? " " : "";
+              ghostValues[row][col] = prefix + currentGhost;
+            }
+          }
+          // 'U' cells: transparent, don't change currentGhost
+        } else {
+          // col >= allCells[row].size(): column absent in this row.
+          // Fixed-width modes treat absent columns like 'E' — hold and show ghost.
+          // POLY_NON_BLANK (variable-width) treats absent columns as truly nonexistent.
+          bool fixedWidth = !module || module->polyphonyMode != Spellbook::POLY_NON_BLANK;
+          if (fixedWidth && !currentGhost.empty()) {
+            std::string prefix = (col > 0) ? " " : "";
+            ghostValues[row][col] = prefix + currentGhost;
+          }
+        }
+      }
+    }
+  }
   NVGcolor lineColor = textColor;
   NVGcolor activeColor = textColor;
   std::vector<size_t> firstRowColumnPositions;  // Character positions of column starts from row 1 (for ghost drawing in short rows)
@@ -1304,13 +1429,15 @@ struct SpellbookTextField : LedDisplayTextField {
   
   void cleanAndPublishText() {
     std::string cleanedText = cleanAndPadText(getText());
-    
+
     if (module) {
+      // Write text under the mutex so the audio thread never reads a partial string
+      std::lock_guard<std::mutex> lock(module->textMutex);
       module->text = cleanedText;
       module->dirty = true;
     }
     setText(cleanedText);  // Make sure to update the text within this widget too
-      // This happens whether or not we successfully updated a module, but we don't exist otherwise, so that's okay?
+    computeGhostValuesFromText();  // Recompute ghost display (UI-thread-only, no race)
     updateSizeAndOffset();
   }
 
@@ -1366,16 +1493,16 @@ struct SpellbookTextField : LedDisplayTextField {
       firstRow = false;
     }
 
-    // Normalize the number of columns in all rows
-    for (auto& row : rows) {
-      while (row.size() < maxColumns) {
-        row.push_back("");  // Add empty strings for missing columns
-      }
-    }
-
-    // Second pass: construct the cleaned text with proper padding and commas
+    // Second pass: construct the cleaned text, padding all rows to maxColumns for
+    // visual clarity and ease of editing. Variable-width semantics are handled by
+    // the polyphony mode at runtime — 'E' cells in POLY_NON_BLANK output 0v (no hold),
+    // while 'E' cells in fixed-width modes hold their last value as before.
     std::string cleanedText;
     for (auto& row : rows) {
+      // Pad shorter rows with empty cells so every row shows the full column grid
+      while (row.size() < maxColumns) {
+        row.push_back("");
+      }
       for (size_t i = 0; i < row.size(); ++i) {
         cleanedText += row[i];
         if (i < row.size() - 1) {
@@ -1388,7 +1515,6 @@ struct SpellbookTextField : LedDisplayTextField {
             cleanedText += std::string(columnWidths[i] - row[i].size(), ' ');
           }
         }
-      
       }
       cleanedText += '\n';
     }
@@ -1510,8 +1636,16 @@ struct SpellbookTextField : LedDisplayTextField {
         return;
       } else if (e.keyName == "]" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
         resizeText(1);
+        e.consume(this);
       } else if (e.keyName == "[" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
         resizeText(-1);
+        e.consume(this);
+      } else if (e.keyName == "=" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
+        resizeText(1);  // Ctrl+= (same key as + without shift) grows text
+        e.consume(this);
+      } else if (e.keyName == "-" && (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL) {
+        resizeText(-1);  // Ctrl+- shrinks text
+        e.consume(this);
       } else {
         LedDisplayTextField::onSelectKey(e);  // Delegate other keys to the base class
       }
@@ -1624,9 +1758,9 @@ struct SpellbookTextField : LedDisplayTextField {
         size_t ghostExtra = 0;
         if (module) {
           // Scan all rows for this column to find any ghost that adds width
-          for (size_t row = 0; row < module->ghostValues.size(); row++) {
-            if (colIndex < module->ghostValues[row].size() && !module->ghostValues[row][colIndex].empty()) {
-              ghostExtra = std::max(ghostExtra, module->ghostValues[row][colIndex].length());
+          for (size_t row = 0; row < ghostValues.size(); row++) {
+            if (colIndex < ghostValues[row].size() && !ghostValues[row][colIndex].empty()) {
+              ghostExtra = std::max(ghostExtra, ghostValues[row][colIndex].length());
             }
           }
         }
@@ -1690,7 +1824,7 @@ struct SpellbookTextField : LedDisplayTextField {
       // Draw ghost values for empty cells (only when not focused / in playback mode)
       // Also track offsets for cells with ghosts so comments don't overlap
       std::map<size_t, size_t> ghostOffsets;  // Maps cell start position to ghost text length
-      if (!focused && module && lineIndex < (int)module->ghostValues.size()) {
+      if (!focused && module && lineIndex < (int)ghostValues.size()) {
         // Parse line into cells to find positions
         std::vector<size_t> cellStarts;
         cellStarts.push_back(0);
@@ -1701,7 +1835,7 @@ struct SpellbookTextField : LedDisplayTextField {
         }
 
         // For each cell, check if it's empty and has a ghost value
-        for (size_t col = 0; col < cellStarts.size() && col < module->ghostValues[lineIndex].size(); col++) {
+        for (size_t col = 0; col < cellStarts.size() && col < ghostValues[lineIndex].size(); col++) {
           size_t cellStart = cellStarts[col];
           size_t cellEnd = (col + 1 < cellStarts.size()) ? cellStarts[col + 1] - 1 : line.length();
 
@@ -1715,26 +1849,26 @@ struct SpellbookTextField : LedDisplayTextField {
           // Trim whitespace to check if empty
           bool isEmpty = cellContent.find_first_not_of(" \t") == std::string::npos;
 
-          if (isEmpty && !module->ghostValues[lineIndex][col].empty()) {
+          if (isEmpty && !ghostValues[lineIndex][col].empty()) {
             // Calculate ghost position with cumulative offset from previous columns
             float colOffset = (col < columnCumulativeGhostExtras.size()) ? columnCumulativeGhostExtras[col] * charWidth : 0;
             float ghostX = x + cellStart * charWidth + colOffset;
             nvgFillColor(args.vg, ghostColor);
-            nvgText(args.vg, ghostX, y, module->ghostValues[lineIndex][col].c_str(), NULL);
+            nvgText(args.vg, ghostX, y, ghostValues[lineIndex][col].c_str(), NULL);
             // Track offset so comments get pushed right
             if (hasComment) {
-              ghostOffsets[cellStart] = module->ghostValues[lineIndex][col].length();
+              ghostOffsets[cellStart] = ghostValues[lineIndex][col].length();
             }
           }
         }
 
         // Also draw ghosts for columns beyond the line's text (short rows)
         // Use the stored firstRowColumnPositions to know where to draw
-        for (size_t col = cellStarts.size(); col < module->ghostValues[lineIndex].size(); col++) {
-          if (!module->ghostValues[lineIndex][col].empty() && col < firstRowColumnPositions.size()) {
+        for (size_t col = cellStarts.size(); col < ghostValues[lineIndex].size(); col++) {
+          if (!ghostValues[lineIndex][col].empty() && col < firstRowColumnPositions.size()) {
             float ghostX = x + firstRowColumnPositions[col] * charWidth;  // firstRowColumnPositions already includes cumulative offsets
             nvgFillColor(args.vg, ghostColor);
-            nvgText(args.vg, ghostX, y, module->ghostValues[lineIndex][col].c_str(), NULL);
+            nvgText(args.vg, ghostX, y, ghostValues[lineIndex][col].c_str(), NULL);
           }
         }
       }

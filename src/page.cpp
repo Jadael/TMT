@@ -72,6 +72,8 @@ struct Page : Module {
             leftMessages[i].currentStep = 0;
             leftMessages[i].totalSteps = 0;
             leftMessages[i].totalColumns = 0;
+            leftMessages[i].maxColumns = 0;
+            leftMessages[i].polyphonyMode = 0;
             for (int j = 0; j < MAX_EXPANDER_COLUMNS; j++) {
                 leftMessages[i].outputVoltages[j] = 0.0f;
             }
@@ -82,6 +84,8 @@ struct Page : Module {
             rightMessages[i].currentStep = 0;
             rightMessages[i].totalSteps = 0;
             rightMessages[i].totalColumns = 0;
+            rightMessages[i].maxColumns = 0;
+            rightMessages[i].polyphonyMode = 0;
             for (int j = 0; j < MAX_EXPANDER_COLUMNS; j++) {
                 rightMessages[i].outputVoltages[j] = 0.0f;
             }
@@ -117,25 +121,43 @@ struct Page : Module {
                     lastConfiguredPosition = position;
                 }
 
-                int activeChannels = 0;
+                // Poly channel count is always based on the CURRENT step's column count.
+                // Columns that don't exist in this step don't overflow to Page at all —
+                // they stay within (or below) the 16 that Spellbook handles directly.
+                // This means the poly channel count shrinks and grows with each step,
+                // reflecting exactly how many overflow columns are actually present.
+                int overflowColumns = std::max(0, std::min(message->totalColumns - startColumn, 16));
+                int polyChannel = 0;
 
                 // Output the pre-calculated voltages for this expander's 16 columns
                 for (int i = 0; i < 16; i++) {
                     int columnIndex = startColumn + i;
                     float outputValue = 0.0f;
 
-                    // Only process if this column exists
-                    if (columnIndex < message->totalColumns && columnIndex < MAX_EXPANDER_COLUMNS) {
-                        // Simply read the pre-calculated voltage from Spellbook
+                    bool columnExists = (columnIndex < message->totalColumns && columnIndex < MAX_EXPANDER_COLUMNS);
+                    if (columnExists) {
                         outputValue = message->outputVoltages[columnIndex];
-                        activeChannels = i + 1;
                     }
 
+                    // Mono output: always at its fixed physical position
                     outputs[OUT01_OUTPUT + i].setVoltage(outputValue);
-                    outputs[POLY_OUTPUT].setVoltage(outputValue, i);
+
+                    // Poly output: POLY_NON_BLANK packs present columns consecutively;
+                    // other modes map each column to its fixed position within the overflow range.
+                    if (message->polyphonyMode == 1) {
+                        // POLY_NON_BLANK: only columns that exist in this step are packed
+                        if (columnExists) {
+                            outputs[POLY_OUTPUT].setVoltage(outputValue, polyChannel++);
+                        }
+                    } else {
+                        // POLY_WIDEST_ROW / POLY_UP_TO_LAST: fixed position within overflow range
+                        if (columnExists) {
+                            outputs[POLY_OUTPUT].setVoltage(outputValue, i);
+                        }
+                    }
                 }
 
-                outputs[POLY_OUTPUT].setChannels(activeChannels);
+                outputs[POLY_OUTPUT].setChannels(message->polyphonyMode == 1 ? polyChannel : overflowColumns);
 
                 // Forward message to right expander (if it's another Page)
                 if (rightExpander.module && rightExpander.module->model == modelPage && rightExpander.module->leftExpander.consumerMessage) {
@@ -145,6 +167,8 @@ struct Page : Module {
                     rightMessage->currentStep = message->currentStep;
                     rightMessage->totalSteps = message->totalSteps;
                     rightMessage->totalColumns = message->totalColumns;
+                    rightMessage->maxColumns = message->maxColumns;
+                    rightMessage->polyphonyMode = message->polyphonyMode;
 
                     // Copy the voltage array
                     for (int i = 0; i < MAX_EXPANDER_COLUMNS; i++) {
@@ -154,20 +178,22 @@ struct Page : Module {
                     rightExpander.module->leftExpander.messageFlipRequested = true;
                 }
             } else {
-                // No data from left module - output zeros
+                // No data from left module - output zeros with 0 channels
                 for (int i = 0; i < 16; i++) {
                     outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
                     outputs[POLY_OUTPUT].setVoltage(0.0f, i);
                 }
+                outputs[POLY_OUTPUT].setChannels(0);
             }
         } else {
-            // Not connected to anything - output zeros
+            // Not connected to anything - output zeros with 0 channels
             position = 0;
             baseID = -1;
             for (int i = 0; i < 16; i++) {
                 outputs[OUT01_OUTPUT + i].setVoltage(0.0f);
                 outputs[POLY_OUTPUT].setVoltage(0.0f, i);
             }
+            outputs[POLY_OUTPUT].setChannels(0);
         }
     }
 };

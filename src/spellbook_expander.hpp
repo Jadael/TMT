@@ -28,6 +28,8 @@ struct SpellbookExpanderMessage {
     int position = 0;              // Position in the chain (1=first Page, 2=second, etc.)
     int currentStep = 0;           // Current step in the sequence
     int totalSteps = 0;            // Total number of steps in the sequence
-    int totalColumns = 0;          // Total number of columns in current step
+    int totalColumns = 0;          // Column count in the current step (variable per step)
+    int maxColumns = 0;            // Maximum column count across all steps (widest row)
+    int polyphonyMode = 0;         // Mirrors Spellbook's polyphony mode (0=WIDEST_ROW, 1=NON_BLANK, 2=UP_TO_LAST)
     float outputVoltages[MAX_EXPANDER_COLUMNS];  // Pre-calculated output voltages for all columns
 };
